@@ -58,12 +58,8 @@
       (whittle/update-lang
         (fn [spec]
           (-> spec
-              (whittle/add-node :symbol
-                                "#'[a-zA-s]+'"
-                                keyword)
-              (whittle/add-node :var       
-                                (comb/nt :symbol)
-                                emit-var)
+              (whittle/add-node :symbol "#'[a-zA-s]+'" keyword)
+              (whittle/add-node :var (comb/nt :symbol) emit-var)
               (whittle/alt-node :term (comb/nt :var) :hide? true))))))
 
 (def v3
@@ -81,13 +77,8 @@
       (whittle/update-lang
         (fn [spec]
           (-> spec
-              (whittle/add-node :symbol
-                                "#'[a-zA-s]+'"
-                                keyword)
-              (whittle/add-node :var       
-                                (comb/nt :symbol)
-                                emit-var
-                                :trace? true)
+              (whittle/add-node :symbol "#'[a-zA-s]+'" keyword)
+              (whittle/add-node :var (comb/nt :symbol) emit-var :trace? true)
               (whittle/alt-node :term (comb/nt :var) :hide? true))))))
 
 (defn emit-statement

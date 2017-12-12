@@ -45,7 +45,9 @@
 
 (defn compiler-fn
   [{:keys [start grammar transforms] :as compiler-spec}]
-  (let [parse (insta/parser grammar :start start)]
+  (let [parse (insta/parser grammar
+                            :start           start
+                            :auto-whitespace :standard)]
     (with-meta (fn [template & {:keys [stack-root]}]
                  (let [ast (parse template)]
                    (if (insta/failure? ast)
