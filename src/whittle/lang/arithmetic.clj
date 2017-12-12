@@ -1,5 +1,6 @@
 (ns whittle.lang.arithmetic
-  (:require [whittle.core :as whittle]))
+  (:require [instaparse.combinators :as comb]
+            [whittle.core :as whittle]))
 
 (def expr-grammar
   "expr     = add-sub
@@ -24,11 +25,15 @@
                  :number clojure.edn/read-string
                  :expr   identity}}))
 
+(defn apply-or-identity
+  [ctx x]
+  (if (fn? x) (x ctx) x))
+
 (defn applies-args
   [f]
   (fn [& args]
     (fn [ctx]
-      (apply f (map #(if (fn? %) (% ctx) %) args)))))
+      (apply f (map #(apply-or-identity ctx %) args)))))
 
 (def v2
   "Returns a function which, when called with a map 'ctx', returns the value
@@ -43,11 +48,16 @@
                      :div    (applies-args /)
                      :number clojure.edn/read-string
                      :expr   identity}})
-      (whittle/extend-node :term
-                           {:node      :symbol
-                            :grammar   "#'[a-zA-Z](-|[a-zA-Z])*'"
-                            :hide?     true
-                            :transform (fn [name] (fn [ctx] (get ctx (keyword name))))})))
+      (whittle/update-lang
+        (fn [spec]
+          (-> spec
+              (whittle/add-node :symbol
+                                "#'[a-zA-s]+'"
+                                keyword)
+              (whittle/add-node :var-lookup
+                                (comb/nt :symbol)
+                                (fn [name] (fn [ctx] (get ctx name))))
+              (whittle/alt-node :term (comb/nt :var-lookup) :hide? true))))))
 
 (def v3
   "The same as the language defined by 'v2', except errors such as division by zero and unbound
@@ -61,35 +71,70 @@
                      :mul  (applies-args *)
                      :div  (applies-args /)
                      :expr (applies-args identity)}})
-      (whittle/extend-node :term
-                           {:node      :symbol
-                            :grammar   "#'[a-zA-Z](-|[a-zA-Z])*'"
-                            :hide?     true
-                            :transform (fn [name]
-                                         (fn [ctx]
-                                           (if-let [x (get ctx (keyword name))]
-                                             x
-                                             (throw (Exception. (str name " is undefined"))))))})))
+      (whittle/update-lang
+        (fn [spec]
+          (-> spec
+              (whittle/add-node :symbol
+                                "#'[a-zA-s]+'"
+                                keyword)
+              (whittle/add-node :var-lookup
+                                (comb/nt :symbol)
+                                (fn [name]
+                                  (fn [ctx]
+                                    (if-let [value (get ctx name)]
+                                      value
+                                      (throw (Exception. (str name " is undefined."))))))
+                                :trace? true)
+              (whittle/alt-node :term (comb/nt :var-lookup) :hide? true))))))
 
-(def lemma-v1
-  (whittle/create-compiler
-    {:start    :statement
-     :grammar  "statement = [<'let'> (<' '> let)+] expr
-                let       = symbol <'='> expr <';'>
-                expr      = 'e'
-                symbol    = 's'
-                number    = 'n'"
-     :branches  {:statement (fn [& statements]
-                              (let [let-clauses (butlast statements)
-                                    expr        (last statements)]
-                                (fn [ctx]
-                                  (expr (reduce (fn [ctx let-node] (let-node ctx))
-                                                ctx
-                                                let-clauses)))))
-                 :let       (fn [name expr]
-                              (fn [ctx]
-                                (assoc ctx name (expr ctx))))}}))
+(defn emit-statement
+  [& statements]
+  (let [let-clauses (butlast statements)
+        expr        (last statements)]
+    (fn [ctx]
+      (expr (reduce (fn [ctx let-node] (let-node ctx))
+                    ctx
+                    let-clauses)))))
+
+(defn emit-let
+  [name expr]
+  (fn [ctx]
+    (assoc ctx name (expr ctx))))
 
 (def v4
-  (whittle/union lemma-v1 v3))
+  (whittle/update-lang v3
+                       whittle/combine
+                       {:start    :statement
+                        :grammar  "statement = [<'let'> (<' '> let)+] expr
+                                   let       = symbol <'='> expr <';'>"
+                        :branches  {:statement emit-statement
+                                    :let       emit-let}}))
+
+
+(def v5
+  (whittle/update-lang v4
+                       (fn [lang]
+                         (-> lang
+                             (whittle/remove-node :let)
+                             (whittle/combine
+                               {:grammar "<let>       = (var-let | fn-let) <';'>
+                                          var-let     = symbol <'='> expr
+                                          fn-let      = symbol fn-params <'='> fn-body
+                                          fn-params   = <'('> symbol (<','> symbol)* <')'>
+                                          fn-args     = <'('> expr (<','> expr)* <')'>
+                                          <fn-body>   = <'{'> statement <'}'>
+                                          fn-apply    = symbol fn-args"
+                                :branches {:fn-params list
+                                           :fn-args   list
+                                           :fn-let   (fn [name params body]
+                                                       (fn [ctx]
+                                                         (assoc ctx
+                                                           name (fn [& args]
+                                                                  (body (merge ctx (zipmap params args)))))))
+                                           :var-let  emit-let
+                                           :fn-apply (fn [name args]
+                                                       (fn [ctx]
+                                                         (apply (get ctx name)
+                                                                (map #(apply-or-identity ctx %) args))))}})
+                             (whittle/alt-node :term (comb/nt :fn-apply) :hide? true)))))
 

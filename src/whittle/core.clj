@@ -2,6 +2,8 @@
   (:require [instaparse.core :as insta]
             [instaparse.combinators :as comb]))
 
+(defn ebnf [x] (if (string? x) (comb/ebnf x) x))
+
 (defrecord Failure [render-fns deps errors])
 
 (defn failure? [x] (instance? Failure x))
@@ -67,28 +69,42 @@
        :grammar    grammar
        :transforms (into terminals (map #(apply call-frame %)) branches)})))
 
-(defn union
-  [c1 c2]
-  (let [c1-spec (meta c1)
-        c2-spec (meta c2)]
-    (compiler-fn
-      {:start      (:start c1-spec)
-       :grammar    (merge (:grammar c1-spec) (:grammar c2-spec))
-       :transforms (merge (:transforms c1-spec) (:transforms c2-spec))})))
+(defn update-lang
+  [compiler f & args]
+  (compiler-fn (apply f (meta compiler) args)))
 
-(defn extend-node
-  [compiler parent-node {:keys [node transform grammar hide?]}]
-  (let [node-grammar (if (string? grammar) (comb/ebnf grammar) grammar)]
-    (compiler-fn
-      (-> (meta compiler)
-          (update :grammar
-                  (fn [g]
-                    (-> g
-                        (update parent-node
-                                (fn [parent-grammar]
-                                  (let [parent-grammar' (comb/alt parent-grammar (comb/ebnf (name node)))]
-                                    (if hide? (comb/hide-tag parent-grammar') parent-grammar'))))
-                        (assoc node node-grammar))))
-          (update :transforms
-                  conj
-                  (call-frame node transform))))))
+(defn combine
+  [spec {:keys [start grammar terminals branches]}]
+  (-> spec
+      (update :start #(or start %))
+      (update :grammar merge (ebnf grammar))
+      (update :transforms
+              (fn [transforms]
+                (into (merge transforms terminals)
+                      (map #(apply call-frame %))
+                      branches)))))
+
+(defn add-node
+  [spec node grammar transform & {:keys [trace?]}]
+  (-> spec
+      (update :grammar
+              assoc
+              node
+              (if (string? grammar) (comb/ebnf grammar) grammar))
+      (update :transforms
+              conj
+              (if trace? (call-frame node transform) [node transform]))))
+
+(defn remove-node
+  [spec node]
+  (-> spec
+      (update :grammar dissoc node)
+      (update :transforms dissoc node)))
+
+(defn alt-node
+  [spec node alt-grammar & {:keys [hide?]}]
+  (update-in spec
+             [:grammar node]
+             (fn [grammar]
+               (let [grammar' (comb/alt grammar alt-grammar)]
+                 (if hide? (comb/hide-tag grammar') grammar')))))
