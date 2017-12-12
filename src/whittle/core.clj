@@ -28,7 +28,13 @@
 
 (defn item-trace
   [node]
-  [(:context (meta node)) (insta/span node)])
+  [(:context (meta node)) (select-keys (meta node)
+                                       [:instaparse.gll/start-index
+                                        :instaparse.gll/start-line
+                                        :instaparse.gll/start-column
+                                        :instaparse.gll/end-index
+                                        :instaparse.gll/end-line
+                                        :instaparse.gll/end-column])])
 
 (defn traced-transform
   [node transform]
@@ -51,7 +57,7 @@
     result))
 
 (defn compiler-fn
-  [{:keys [start grammar transforms] :as compiler-spec}]
+  [{:keys [start grammar transforms] :as lang}]
   (let [parse (insta/parser grammar
                             :start           start
                             :auto-whitespace :standard)]
@@ -59,8 +65,9 @@
                  (let [ast (parse template)]
                    (if (insta/failure? ast)
                      (fail :parser-error :error ast)
-                     (root-frame ast (insta/transform transforms ast) stack-root))))
-               compiler-spec)))
+                     (let [ast (insta/add-line-and-column-info-to-metadata template ast)]
+                       (root-frame ast (insta/transform transforms ast) stack-root)))))
+               lang)))
 
 (def trace-xf
   (map (fn [[node transform]] [node (traced-transform node transform)])))
@@ -78,27 +85,27 @@
   (compiler-fn (apply f (meta compiler) args)))
 
 (defn combine
-  [spec {:keys [start grammar transforms]}]
-  (-> spec
+  [lang {:keys [start grammar transforms]}]
+  (-> lang
       (update :start #(or start %))
       (update :grammar merge (ebnf grammar))
       (update :transforms into trace-xf transforms)))
 
 (defn add-node
-  [spec node grammar transform]
-  (-> spec
+  [lang node grammar transform]
+  (-> lang
       (update :grammar assoc node (ebnf grammar))
       (update :transforms assoc node (traced-transform node transform))))
 
 (defn remove-node
-  [spec node]
-  (-> spec
+  [lang node]
+  (-> lang
       (update :grammar dissoc node)
       (update :transforms dissoc node)))
 
 (defn alt-node
-  [spec node alt-grammar & {:keys [hide?]}]
-  (update-in spec
+  [lang node alt-grammar & {:keys [hide?]}]
+  (update-in lang
              [:grammar node]
              (fn [grammar]
                (let [grammar' (comb/alt grammar alt-grammar)]

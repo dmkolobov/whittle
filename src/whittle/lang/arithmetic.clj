@@ -26,14 +26,14 @@
                   :expr   identity}}))
 
 (defn apply-or-identity
-  [ctx x]
-  (if (fn? x) (x ctx) x))
+  [x & args]
+  (if (fn? x) (apply x args) x))
 
 (defn applies-args
   [f]
   (fn [& args]
     (fn [ctx]
-      (apply f (map #(apply-or-identity ctx %) args)))))
+      (apply f (map #(apply-or-identity % ctx) args)))))
 
 (defn emit-var
   [name]
@@ -98,7 +98,7 @@
   [name & args]
   (fn [ctx]
     (apply (get ctx name)
-           (map #(apply-or-identity ctx %) args))))
+           (map #(apply-or-identity % ctx) args))))
 
 (def let-grammar
   "<let>   = (let-var | let-fn) <';'>
