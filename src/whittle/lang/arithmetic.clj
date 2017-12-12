@@ -18,12 +18,12 @@
   (whittle/create-compiler
     {:grammar   expr-grammar
      :start     :expr
-     :terminals {:add    +
-                 :sub    -
-                 :mul    *
-                 :div    /
-                 :number clojure.edn/read-string
-                 :expr   identity}}))
+     :transforms {:add    +
+                  :sub    -
+                  :mul    *
+                  :div    /
+                  :number clojure.edn/read-string
+                  :expr   identity}}))
 
 (defn apply-or-identity
   [ctx x]
@@ -47,38 +47,19 @@
    of the arithmetic expression written in infix notation, where each single-word English
    identifier is substituted with the corresponding value in 'ctx' prior to evaluation."
   (-> (whittle/create-compiler
-        {:grammar   expr-grammar
-         :start     :expr
-         :terminals {:add    (applies-args +)
-                     :sub    (applies-args -)
-                     :mul    (applies-args *)
-                     :div    (applies-args /)
-                     :number clojure.edn/read-string
-                     :expr   identity}})
+        {:grammar    expr-grammar
+         :start      :expr
+         :transforms {:number clojure.edn/read-string
+                      :add    (applies-args +)
+                      :sub    (applies-args -)
+                      :mul    (applies-args *)
+                      :div    (applies-args /)
+                      :expr   (applies-args identity)}})
       (whittle/update-lang
         (fn [spec]
           (-> spec
               (whittle/add-node :symbol "#'[a-zA-s]+'" keyword)
               (whittle/add-node :var (comb/nt :symbol) emit-var)
-              (whittle/alt-node :term (comb/nt :var) :hide? true))))))
-
-(def v3
-  "The same as the language defined by 'v2', except errors such as division by zero and unbound
-  identifiers are traced through the source."
-  (-> (whittle/create-compiler
-        {:grammar   expr-grammar
-         :start     :expr
-         :terminals {:number clojure.edn/read-string}
-         :branches  {:add  (applies-args +)
-                     :sub  (applies-args -)
-                     :mul  (applies-args *)
-                     :div  (applies-args /)
-                     :expr (applies-args identity)}})
-      (whittle/update-lang
-        (fn [spec]
-          (-> spec
-              (whittle/add-node :symbol "#'[a-zA-s]+'" keyword)
-              (whittle/add-node :var (comb/nt :symbol) emit-var :trace? true)
               (whittle/alt-node :term (comb/nt :var) :hide? true))))))
 
 (defn emit-statement
@@ -95,8 +76,8 @@
   (fn [ctx]
     (assoc ctx name (expr ctx))))
 
-(def v4
-  (whittle/update-lang v3
+(def v3
+  (whittle/update-lang v2
                        whittle/combine
                        {:start    :statement
                         :grammar  "statement = [<'let'> (<' '> let)+] expr
@@ -127,16 +108,16 @@
              <'}'>\n\n
   fn-apply = symbol <'('> expr (<','> expr)* <')'>")
 
-(def v5
-  (whittle/update-lang v4
+(def v4
+  (whittle/update-lang v3
                        (fn [lang]
                          (-> lang
                              (whittle/remove-node :let)
                              (whittle/combine
-                               {:grammar let-grammar
-                                :branches {:let-fn    emit-let-fn
-                                           :let-var   emit-let-var
-                                           :fn-apply  emit-apply}})
+                               {:grammar    let-grammar
+                                :transforms {:let-fn    emit-let-fn
+                                             :let-var   emit-let-var
+                                             :fn-apply  emit-apply}})
                              (whittle/alt-node :term (comb/nt :fn-apply) :hide? true)))))
 
 (def final
@@ -160,17 +141,17 @@
                      "\n"
                      let-grammar)
 
-     :terminals {:number clojure.edn/read-string
-                 :symbol keyword}
+     :transforms {:number clojure.edn/read-string
+                  :symbol keyword
 
-     :branches  {:add  (applies-args +)
-                 :sub  (applies-args -)
-                 :mul  (applies-args *)
-                 :div  (applies-args /)
-                 :expr (applies-args identity)
+                  :add  (applies-args +)
+                  :sub  (applies-args -)
+                  :mul  (applies-args *)
+                  :div  (applies-args /)
+                  :expr (applies-args identity)
 
-                 :statement  emit-statement
-                 :var        emit-var
-                 :let-var    emit-let-var
-                 :let-fn     emit-let-fn
-                 :fn-apply   emit-apply}}))
+                  :statement  emit-statement
+                  :var        emit-var
+                  :let-var    emit-let-var
+                  :let-fn     emit-let-fn
+                  :fn-apply   emit-apply}}))
