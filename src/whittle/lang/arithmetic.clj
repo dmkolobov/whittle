@@ -16,8 +16,8 @@
 (def v1
   "Returns the value of an arithmetic expression written in infix notation."
   (whittle/create-compiler
-    {:grammar   expr-grammar
-     :start     :expr
+    {:grammar    expr-grammar
+     :start      :expr
      :transforms {:add    +
                   :sub    -
                   :mul    *
@@ -123,23 +123,22 @@
 (def final
   (whittle/create-compiler
     {:start     :statement
-     :grammar   (str "statement = [<'let'> (<' '> let)+] expr
+     :grammars  ["statement = [<'let'> (<' '> let)+] expr
 
-                      var       = symbol
+                  var       = symbol
 
-                      expr      = add-sub
-                      <add-sub> = mul-div | add | sub
-                      add       = add-sub <'+'> mul-div
-                      sub       = add-sub <'-'> mul-div
-                      <mul-div> = term | mul | div
-                      mul       = mul-div <'*'> term
-                      div       = mul-div <'/'> term
-                      <term>    = number | <'('> add-sub <')'> | fn-apply | var
+                  expr      = add-sub
+                  <add-sub> = mul-div | add | sub
+                  add       = add-sub <'+'> mul-div
+                  sub       = add-sub <'-'> mul-div
+                  <mul-div> = term | mul | div
+                  mul       = mul-div <'*'> term
+                  div       = mul-div <'/'> term
+                  <term>    = number | <'('> add-sub <')'> | fn-apply | var
 
-                      number    = #'[0-9]+'
-                      symbol    = #'[a-zA-s]+'"
-                     "\n"
-                     let-grammar)
+                  number    = #'[0-9]+'
+                  symbol    = #'[a-zA-s]+'"
+                 let-grammar]
 
      :transforms {:number clojure.edn/read-string
                   :symbol keyword

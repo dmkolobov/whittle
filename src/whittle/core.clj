@@ -32,7 +32,6 @@
 
 (defn traced-transform
   [node transform]
-  (println "tracing" node)
   (fn [& node-v]
     (let [value (apply transform
                        (map (fn [value]
@@ -67,12 +66,11 @@
   (map (fn [[node transform]] [node (traced-transform node transform)])))
 
 (defn create-compiler
-  [{:keys [start grammar transforms]}]
+  [{:keys [start grammar grammars transforms]}]
   (let [grammar (ebnf grammar)]
-    (println transforms)
     (compiler-fn
       {:start      start
-       :grammar    grammar
+       :grammar    (if (seq grammars) (apply merge (map ebnf grammars)) grammar)
        :transforms (into {} trace-xf transforms)})))
 
 (defn update-lang
