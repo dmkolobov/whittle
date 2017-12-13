@@ -107,3 +107,27 @@
 
 (def fn-lang
   (whittle let-lang fn-extension))
+
+(def clj-lang
+  (whittle fn-lang
+           {:transforms {:add      (partial list '+)
+                         :sub      (partial list '-)
+                         :mul      (partial list '*)
+                         :div      (partial list '/)
+
+                         :let-expr (fn [& let-v]
+                                     (let [clauses (butlast let-v)
+                                           expr    (last let-v)]
+                                       (if-let [bindings (seq (apply concat clauses))]
+                                         (list 'let (vec bindings) expr)
+                                         expr)))
+                         :let      vector
+                         :var      identity
+
+                         :fn-apply list
+                         :fn       (fn [& fn-v]
+                                     (let [params (butlast fn-v)
+                                           body   (last fn-v)]
+                                       (list 'fn (vec params) body)))
+
+                         :symbol   symbol}}))
