@@ -1,6 +1,7 @@
 (ns whittle.core
   (:require [instaparse.core :as insta]
-            [instaparse.combinators :as comb]))
+            [instaparse.combinators :as comb]
+            [instaparse.combinators-source :refer [hidden-tag?]]))
 
 (defn ebnf [x] (if (string? x) (comb/ebnf x) x))
 
@@ -72,41 +73,29 @@
 (def trace-xf
   (map (fn [[node transform]] [node (traced-transform node transform)])))
 
-(defn create-compiler
-  [{:keys [start grammar grammars transforms]}]
-  (let [grammar (ebnf grammar)]
-    (compiler-fn
-      {:start      start
-       :grammar    (if (seq grammars) (apply merge (map ebnf grammars)) grammar)
-       :transforms (into {} trace-xf transforms)})))
+(defn update-grammar
+  [lang-grammar {:keys [grammar alts]}]
+  (reduce (fn [grammar [node alt-grammar]]
+            (let [node-grammar  (get grammar node)
+                  node-grammar' (comb/alt node-grammar (ebnf alt-grammar))]
+              (assoc grammar
+                node (if (hidden-tag? node-grammar)
+                        (comb/hide-tag node-grammar')
+                        node-grammar'))))
+          (merge (ebnf lang-grammar)
+                 (ebnf grammar))
+          alts))
 
-(defn update-lang
-  [compiler f & args]
-  (compiler-fn (apply f (meta compiler) args)))
-
-(defn combine
-  [lang {:keys [start grammar transforms]}]
+(defn extend-lang
+  [lang {:keys [start transforms] :as ext}]
   (-> lang
       (update :start #(or start %))
-      (update :grammar merge (ebnf grammar))
+      (update :grammar update-grammar ext)
       (update :transforms into trace-xf transforms)))
 
-(defn add-node
-  [lang node grammar transform]
-  (-> lang
-      (update :grammar assoc node (ebnf grammar))
-      (update :transforms assoc node (traced-transform node transform))))
-
-(defn remove-node
-  [lang node]
-  (-> lang
-      (update :grammar dissoc node)
-      (update :transforms dissoc node)))
-
-(defn alt-node
-  [lang node alt-grammar & {:keys [hide?]}]
-  (update-in lang
-             [:grammar node]
-             (fn [grammar]
-               (let [grammar' (comb/alt grammar (ebnf alt-grammar))]
-                 (if hide? (comb/hide-tag grammar') grammar')))))
+(defn whittle
+  [f & exts]
+  (compiler-fn
+    (if (fn? f)
+      (reduce extend-lang (meta f) exts)
+      (reduce extend-lang {:transforms {}} (conj exts f)))))
