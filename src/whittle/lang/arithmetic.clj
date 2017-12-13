@@ -62,37 +62,35 @@
               (whittle/add-node :var (comb/nt :symbol) emit-var)
               (whittle/alt-node :term (comb/nt :var) :hide? true))))))
 
-(defn emit-statement
-  [& statements]
-  (let [let-clauses (butlast statements)
-        expr        (last statements)]
+(defn emit-let-expr
+  [& let-exprs]
+  (let [let-clauses (butlast let-exprs)
+        expr        (last let-exprs)]
     (fn [ctx]
       (expr (reduce (fn [ctx let-node] (let-node ctx))
                     ctx
                     let-clauses)))))
 
-(defn emit-let-var
-  [name expr]
-  (fn [ctx]
-    (assoc ctx name (expr ctx))))
+(defn emit-let
+  [name binding]
+  (fn [ctx] (assoc ctx name (apply-or-identity binding ctx))))
 
 (def v3
   (whittle/update-lang v2
                        whittle/combine
-                       {:start    :statement
-                        :grammar  "statement = [<'let'> (<' '> let)+] expr
-                                   let       = symbol <'='> expr <';'>"
-                        :branches  {:statement emit-statement
-                                    :let       emit-let-var}}))
+                       {:start    :let-expr
+                        :grammar  "let-expr = [<'let'> let (<','> let)* <':'>] expr
+                                   let      = symbol <'='> let-expr"
+                        :transforms  {:let-expr emit-let-expr
+                                      :let      emit-let}}))
 
-(defn emit-let-fn
-  [name & fn-v]
+(defn emit-fn
+  [& fn-v]
   (let [params (butlast fn-v)
         body   (last fn-v)]
     (fn [ctx]
-      (assoc ctx
-        name (fn [& args]
-               (body (merge ctx (zipmap params args))))))))
+      (fn [& args]
+        (body (merge ctx (zipmap params args)))))))
 
 (defn emit-apply
   [name & args]
@@ -100,30 +98,29 @@
     (apply (get ctx name)
            (map #(apply-or-identity % ctx) args))))
 
-(def let-grammar
-  "<let>   = (let-var | let-fn) <';'>
-  let-var  = symbol <'='> expr
-  let-fn   = symbol <'('> symbol (<','> symbol)* <')'> <'='> <'{'>
-                statement
-             <'}'>\n\n
-  fn-apply = symbol <'('> expr (<','> expr)* <')'>")
+(def fn-grammar
+  "fn-apply = symbol <'('> expr (<','> expr)* <')'>
+   fn       = <'('> symbol (<','> symbol)* <')'> <'='> <'{'>
+                let-expr
+              <'}'>")
 
 (def v4
   (whittle/update-lang v3
                        (fn [lang]
                          (-> lang
-                             (whittle/remove-node :let)
                              (whittle/combine
-                               {:grammar    let-grammar
-                                :transforms {:let-fn    emit-let-fn
-                                             :let-var   emit-let-var
+                               {:grammar    fn-grammar
+                                :transforms {:fn        emit-fn
                                              :fn-apply  emit-apply}})
+                             (whittle/alt-node :let "symbol fn")
                              (whittle/alt-node :term (comb/nt :fn-apply) :hide? true)))))
 
 (def final
   (whittle/create-compiler
-    {:start     :statement
-     :grammars  ["statement = [<'let'> (<' '> let)+] expr
+    {:start     :let-expr
+     :grammars  ["let-expr = [<'let'> let (<','> let)* <':'>] expr
+
+                  let       = symbol <'='> let-expr | symbol fn
 
                   var       = symbol
 
@@ -138,7 +135,7 @@
 
                   number    = #'[0-9]+'
                   symbol    = #'[a-zA-s]+'"
-                 let-grammar]
+                 fn-grammar]
 
      :transforms {:number clojure.edn/read-string
                   :symbol keyword
@@ -149,8 +146,8 @@
                   :div  (applies-args /)
                   :expr (applies-args identity)
 
-                  :statement  emit-statement
+                  :let-expr   emit-let-expr
                   :var        emit-var
-                  :let-var    emit-let-var
-                  :let-fn     emit-let-fn
+                  :let        emit-let
+                  :fn         emit-fn
                   :fn-apply   emit-apply}}))

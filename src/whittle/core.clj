@@ -108,5 +108,5 @@
   (update-in lang
              [:grammar node]
              (fn [grammar]
-               (let [grammar' (comb/alt grammar alt-grammar)]
+               (let [grammar' (comb/alt grammar (ebnf alt-grammar))]
                  (if hide? (comb/hide-tag grammar') grammar')))))
