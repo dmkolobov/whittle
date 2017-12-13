@@ -74,7 +74,7 @@
   (map (fn [[node transform]] [node (traced-transform node transform)])))
 
 (defn update-grammar
-  [lang-grammar {:keys [grammar alts]}]
+  [lang-grammar {:keys [grammar alts] :as ext}]
   (reduce (fn [grammar [node alt-grammar]]
             (let [node-grammar  (get grammar node)
                   node-grammar' (comb/alt node-grammar (ebnf alt-grammar))]
