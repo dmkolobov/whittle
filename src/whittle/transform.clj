@@ -13,7 +13,7 @@
     (cond->> children
              before (apply before)
              true   (apply transform)
-             after  (apply after node))))
+             after  (after node))))
 
 (defn merge-meta
   "This variation of the merge-meta in gll does nothing if obj is not

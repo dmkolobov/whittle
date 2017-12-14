@@ -1,6 +1,7 @@
 (ns whittle.lang.arithmetic
   (:require [instaparse.combinators :as comb]
-            [whittle.core :refer [whittle]]))
+            [whittle.core :refer [whittle]]
+            [whittle.util :as util]))
 
 (def lang
   "Returns the value of an arithmetic expression written in infix notation."
@@ -61,6 +62,7 @@
                 symbol   = #'[a-zA-s]+'"
 
    :alts       {:term "var"}
+   :hooks      {:after util/fn-exceptions}
 
    :transforms {:add      (applies-args +)
                 :sub      (applies-args -)
@@ -110,7 +112,8 @@
 
 (def clj-lang
   (whittle fn-lang
-           {:transforms {:add      (partial list '+)
+           {:hooks      nil
+            :transforms {:add      (partial list '+)
                          :sub      (partial list '-)
                          :mul      (partial list '*)
                          :div      (partial list '/)
