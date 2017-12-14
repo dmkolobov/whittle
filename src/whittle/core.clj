@@ -22,8 +22,7 @@
 (defn transform-ast
   [transforms ast template]
   (let [annotated-ast (insta/add-line-and-column-info-to-metadata template ast)]
-    (attach-ast annotated-ast
-                (transform transforms annotated-ast))))
+    (attach-ast annotated-ast (transform transforms annotated-ast))))
 
 (defn compiler-fn
   [{:keys [start grammar transforms hooks] :as lang}]
@@ -38,15 +37,19 @@
                      (transform-ast transforms ast template))))
                lang)))
 
+(defn keep-hidden
+  [grammar node f & args]
+  (update grammar
+          node
+          (fn [rule]
+            (if (hidden-tag? rule)
+              (comb/hide-tag (apply f rule args))
+              (apply f rule args)))))
+
 (defn update-grammar
   [lang-grammar {:keys [grammar alts] :as ext}]
   (reduce (fn [grammar [node alt-grammar]]
-            (let [node-grammar  (get grammar node)
-                  node-grammar' (comb/alt node-grammar (ebnf alt-grammar))]
-              (assoc grammar
-                node (if (hidden-tag? node-grammar)
-                        (comb/hide-tag node-grammar')
-                        node-grammar'))))
+            (keep-hidden grammar node comb/alt (ebnf alt-grammar)))
           (merge (ebnf lang-grammar)
                  (ebnf grammar))
           alts))
@@ -57,9 +60,7 @@
       (assoc :hooks hooks)
       (update :start #(or start %))
       (update :grammar update-grammar ext)
-      (update :transforms
-              into
-              transforms)))
+      (update :transforms into transforms)))
 
 (defn whittle
   [f & exts]
