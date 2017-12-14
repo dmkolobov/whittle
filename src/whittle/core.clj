@@ -1,5 +1,6 @@
 (ns whittle.core
-  (:require [instaparse.core :as insta]
+  (:require [whittle.transform :refer [transform]]
+            [instaparse.core :as insta]
             [instaparse.combinators :as comb]
             [instaparse.combinators-source :refer [hidden-tag?]]))
 
@@ -67,7 +68,7 @@
                    (if (insta/failure? ast)
                      (fail :parser-error :error ast)
                      (let [ast (insta/add-line-and-column-info-to-metadata template ast)]
-                       (root-frame ast (insta/transform transforms ast) stack-root)))))
+                       (root-frame ast (transform transforms ast) stack-root)))))
                lang)))
 
 (def trace-xf
