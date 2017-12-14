@@ -6,21 +6,9 @@
 
 (defn ebnf [x] (if (string? x) (comb/ebnf x) x))
 
-(defrecord Failure [render-fns deps errors])
-
-(defn failure? [x] (instance? Failure x))
-
-(defn fail
-  [id & data]
-  (map->Failure
-    {:deps       #{}
-     :render-fns {}
-     :errors    [(merge {:id id :stack []} (apply hash-map data))]}))
-
 (defn attach-ast
   [ast result]
-  (if (meta result)
-    (with-meta result {:ast ast}) result))
+  (if (meta result) (with-meta result {:ast ast}) result))
 
 (defn wrap-transforms
   [hooks transforms]
@@ -31,6 +19,12 @@
             transforms)
     transforms))
 
+(defn transform-ast
+  [transforms ast template]
+  (let [annotated-ast (insta/add-line-and-column-info-to-metadata template ast)]
+    (attach-ast annotated-ast
+                (transform transforms annotated-ast))))
+
 (defn compiler-fn
   [{:keys [start grammar transforms hooks] :as lang}]
   (let [parse      (insta/parser grammar
@@ -40,9 +34,8 @@
     (with-meta (fn [template]
                  (let [ast (parse template)]
                    (if (insta/failure? ast)
-                     (fail :parser-error :error ast)
-                     (let [ast (insta/add-line-and-column-info-to-metadata template ast)]
-                       (attach-ast ast (transform transforms ast))))))
+                     (throw (ex-info "Parser error" {:ast ast}))
+                     (transform-ast transforms ast template))))
                lang)))
 
 (defn update-grammar
