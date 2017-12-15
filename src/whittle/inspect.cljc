@@ -57,7 +57,7 @@
                      (rest hiccup-tree))
                (meta hiccup-tree))))
 
-(defn playback
+(defn playback*
   "Given a value returned by inspect, return the changes a parse-tree
   goes through as it is transformed."
   [{:keys [ast changes]}]
@@ -93,3 +93,9 @@
        (map (fn [[index result]]
               [index (if (hiccup-tree? result) (first result) result)]))
        (into {})))
+
+(defn playback
+  [{:keys [ast] :as inspection}]
+  (map (fn [tree]
+         {:tree tree :nodes (tree-labels tree)})
+       (playback* inspection)))

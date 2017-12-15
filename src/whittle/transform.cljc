@@ -18,9 +18,8 @@
   "This variation of the merge-meta in gll does nothing if obj is not
 something that can have a metamap attached."
   [obj metamap]
-  (if (instance? clojure.lang.IObj obj)
-      ;#?(:clj (instance? clojure.lang.IObj obj)
-      ;   :cljs (satisfies? IWithMeta obj))
+  (if #?(:clj (instance? clojure.lang.IObj obj)
+         :cljs (satisfies? IWithMeta obj))
     (instaparse.gll/merge-meta obj metamap)
     obj))
 
