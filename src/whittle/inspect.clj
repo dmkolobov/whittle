@@ -1,17 +1,24 @@
 (ns whittle.inspect
-  (:require [instaparse.core :as insta]
+  (:require [clojure.zip :as zip]
+            [instaparse.core :as insta]
+            [whittle.transform :refer [merge-meta]]
             [whittle.core :refer [whittle]]))
+
+(defrecord PlaybackNode [index result])
+
+(defn playback-node? [x] (instance? PlaybackNode x))
 
 (defn tree-index
   "Given a parse tree, return it's index in the AST."
   [tree]
-  (into [(first tree)] (insta/span tree)))
+  (if (playback-node? tree)
+    (:index tree)
+    (into [(first tree)] (insta/span tree))))
 
-(defn tree-change
-  "Given a parse-tree and the result of it's transformation, return
-  a tuple representing this change in the entire AST."
-  [parse-tree result]
-  [(tree-index parse-tree) result])
+(defn hiccup-tree?
+  "Returns true if parse-tree is a vector with a keyword first element."
+  [parse-tree]
+  (and (vector? parse-tree) (keyword? (first parse-tree))))
 
 (defn contains-index?
   "Given a parse tree and a tree-index value, returns true if the  given
@@ -19,13 +26,11 @@
   [parse-tree index]
   (let [[_ start end]         index
         [tree-start tree-end] (insta/span parse-tree)]
-
-    (println "tree" parse-tree "index" [start end] "tree" [tree-start tree-end])
     (<= tree-start start end tree-end)))
 
 (defn inspect-hook
   [changes parse-tree result]
-  (swap! changes conj (tree-change parse-tree result))
+  (swap! changes conj [(tree-index parse-tree) result])
   result)
 
 (defn inspect
@@ -34,7 +39,8 @@
         g       (whittle f {:hooks {:after (partial inspect-hook changes)}})
         result  (g source)
         ast     (:ast (meta result))]
-    {:changes @changes
+    {:source  source
+     :changes @changes
      :ast     ast
      :result  result}))
 
@@ -44,7 +50,7 @@
     result
     (with-meta (into [(first hiccup-tree)]
                      (map (fn [child]
-                            (if (and (vector? child)
+                            (if (and (hiccup-tree? child)
                                      (contains-index? child index))
                               (apply-change child change)
                               child)))
@@ -52,14 +58,38 @@
                (meta hiccup-tree))))
 
 (defn playback
-  "Given a value returned by inspect, return the changes an AST for
-  the given language goes through as it is compiled."
+  "Given a value returned by inspect, return the changes a parse-tree
+  goes through as it is transformed."
   [{:keys [ast changes]}]
   (loop [ast     ast
          tape    []
-         changes changes]
+         changes (map (fn [[index result]]
+                        [index (PlaybackNode. index result)])
+                      changes)]
     (if (seq changes)
       (recur (apply-change ast (first changes))
              (conj tape ast)
              (rest changes))
-      tape)))
+      (conj tape ast))))
+
+(defn tree->nodes
+  [parse-tree]
+  (let [index (tree-index parse-tree)]
+    (conj (->> (rest parse-tree)
+               (map-indexed (fn [idx child]
+                              (when (not (hiccup-tree? child))
+                                (if (playback-node? child)
+                                  [(tree-index child) child]
+                                  [(conj index idx) child]))))
+               (filter some?))
+          [index parse-tree])))
+
+(defn tree-labels
+  [parse-tree]
+  (->> parse-tree
+       (tree-seq hiccup-tree? rest)
+       (filter hiccup-tree?)
+       (mapcat tree->nodes)
+       (map (fn [[index result]]
+              [index (if (hiccup-tree? result) (first result) result)]))
+       (into {})))
