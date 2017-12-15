@@ -10,31 +10,43 @@
   [ast result]
   (if (meta result) (with-meta result {:ast ast}) result))
 
-(defn wrap-transforms
-  [hooks transforms]
-  (if hooks
-    (reduce (fn [tmap [node transform]]
-              (assoc tmap node (with-meta transform hooks)))
-            {}
-            transforms)
-    transforms))
+(defn wrap-before
+  [f before]
+  (cond (and f before) (fn [& children] (->> children (apply f) (apply before)))
+        f              f
+        :default       before))
+
+(defn wrap-after
+  [f after]
+  (cond (and f after) #(->> %2 (f %1) (after %1))
+        f             f
+        :default      after))
+
+(defn wrap-hooks
+  [hooks {:keys [before after] :as new-hooks}]
+  (when new-hooks
+    (-> (or hooks {})
+        (update :before wrap-before before)
+        (update :after wrap-after after))))
 
 (defn transform-ast
-  [transforms ast template]
+  [transforms ast template {:keys [before after]}]
   (let [annotated-ast (insta/add-line-and-column-info-to-metadata template ast)]
-    (attach-ast annotated-ast (transform transforms annotated-ast))))
+    (attach-ast annotated-ast (transform transforms
+                                         annotated-ast
+                                         :before before
+                                         :after  after))))
 
 (defn compiler-fn
   [{:keys [start grammar transforms hooks] :as lang}]
   (let [parse      (insta/parser grammar
                                  :start           start
-                                 :auto-whitespace :standard)
-        transforms (wrap-transforms hooks transforms)]
+                                 :auto-whitespace :standard)]
     (with-meta (fn [template]
                  (let [ast (parse template)]
                    (if (insta/failure? ast)
                      (throw (ex-info "Parser error" {:ast ast}))
-                     (transform-ast transforms ast template))))
+                     (transform-ast transforms ast template hooks))))
                lang)))
 
 (defn keep-hidden
@@ -56,11 +68,11 @@
 
 (defn extend-lang
   [lang {:keys [start transforms hooks] :as ext}]
-  (-> lang
-      (assoc :hooks hooks)
-      (update :start #(or start %))
-      (update :grammar update-grammar ext)
-      (update :transforms into transforms)))
+  (cond-> lang
+          start                  (assoc :start start)
+          (contains? ext :hooks) (update :hooks wrap-hooks hooks)
+          true                   (update :grammar update-grammar ext)
+          true                   (update :transforms into transforms)))
 
 (defn whittle
   [f & exts]

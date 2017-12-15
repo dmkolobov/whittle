@@ -1,5 +1,5 @@
 (ns whittle.lang.arithmetic
-  (:require [instaparse.combinators :as comb]
+  (:require [instaparse.core :as insta]
             [whittle.core :refer [whittle]]
             [whittle.util :as util]))
 
