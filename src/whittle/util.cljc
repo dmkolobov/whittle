@@ -13,7 +13,7 @@
   (if (fn? result)
     (fn [& args]
       (try (apply result args)
-           (catch Exception e
+           (catch #?(:clj Exception :cljs js/Error) e
              (throw
                (ex-info (.getMessage e)
                         (-> (ex-data e)

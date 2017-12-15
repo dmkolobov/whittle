@@ -1,6 +1,7 @@
 (ns whittle.lang.arithmetic
   (:require [instaparse.core :as insta]
             [whittle.core :refer [whittle]]
+            #?(:cljs [cljs.tools.reader.edn])
             [whittle.util :as util]))
 
 (def lang
@@ -20,7 +21,8 @@
                   :sub    -
                   :mul    *
                   :div    /
-                  :number clojure.edn/read-string
+                  :number #?(:clj  clojure.edn/read-string
+                             :cljs cljs.tools.reader.edn/read-string)
                   :expr   identity}}))
 
 (defn apply-or-identity
@@ -38,7 +40,8 @@
   (fn [ctx]
     (if-let [value (get ctx name)]
       value
-      (throw (Exception. (str name " is undefined."))))))
+      (throw #?(:clj  (Exception. (str name " is undefined."))
+                :cljs (js/Error. (str name " is undefined.")))))))
 
 (defn emit-let-expr
   [& let-exprs]
