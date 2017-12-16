@@ -110,7 +110,7 @@
 (defn spread-trees
   [children]
   (reduce (fn [row child]
-            (let [overlap (max-overlap (find-rcontour children) (:lcontour child))
+            (let [overlap (max-overlap (find-rcontour row) (:lcontour child))
                   delta   (+ (:delta (last row)) overlap gap)]
               (println (:key child)
                        (find-rcontour children)

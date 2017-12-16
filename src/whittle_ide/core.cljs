@@ -75,7 +75,7 @@
   []
   [:div
    [:h1 (:text @app-state)]
-   (let [states (playback (inspect clj-lang program-2))]
+   (let [states (playback (inspect clj-lang program-1))]
      (doall (for [tree (take 1 states)] [draw-tree tree])))])
 
 (reagent/render-component [hello-world]
