@@ -1,0 +1,27 @@
+/* some style */
+
+body {
+    font-family: 'Menlo';
+    background: #666;
+}
+
+.tree {
+    background: #aaa;
+}
+
+.tree-label {
+    display: inline-block;
+    color: #fff;
+    background: #000;
+    border-radius: 0.75em;
+    padding: 0.25em 0.5em;
+}
+
+.tree pre {
+    display: inline-block;
+    background: #efefef;
+}
+
+.node {
+    position: absolute;
+}

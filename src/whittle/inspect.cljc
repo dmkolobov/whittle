@@ -8,17 +8,17 @@
 
 (defn playback-node? [x] (instance? PlaybackNode x))
 
-(defn tree-index
-  "Given a parse tree, return it's index in the AST."
-  [tree]
-  (if (playback-node? tree)
-    (:index tree)
-    (into [(first tree)] (insta/span tree))))
-
 (defn hiccup-tree?
   "Returns true if parse-tree is a vector with a keyword first element."
   [parse-tree]
   (and (vector? parse-tree) (keyword? (first parse-tree))))
+
+(defn tree-index
+  "Given a parse tree, return it's index in the AST."
+  [tree]
+  (cond (playback-node? tree) (:index tree)
+        (hiccup-tree? tree)   (into [(first tree)] (insta/span tree))
+        :default              nil))
 
 (defn contains-index?
   "Given a parse tree and a tree-index value, returns true if the  given
@@ -57,7 +57,7 @@
                      (rest hiccup-tree))
                (meta hiccup-tree))))
 
-(defn playback*
+(defn playback
   "Given a value returned by inspect, return the changes a parse-tree
   goes through as it is transformed."
   [{:keys [ast changes]}]
@@ -84,18 +84,10 @@
                (filter some?))
           [index parse-tree])))
 
-(defn tree-labels
+(defn index-tree
   [parse-tree]
   (->> parse-tree
        (tree-seq hiccup-tree? rest)
        (filter hiccup-tree?)
        (mapcat tree->nodes)
-       (map (fn [[index result]]
-              [index (if (hiccup-tree? result) (first result) result)]))
        (into {})))
-
-(defn playback
-  [{:keys [ast] :as inspection}]
-  (map (fn [tree]
-         {:tree tree :nodes (tree-labels tree)})
-       (playback* inspection)))
