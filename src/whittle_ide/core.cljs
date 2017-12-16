@@ -37,7 +37,7 @@
                       :default                (print-code result))]))
         (index-tree result)))
 
-(def char-width 8)
+(def char-width 7.8)
 (def char-height 16)
 
 (defn measure-label
@@ -68,7 +68,7 @@
                            :labels       labels)]
     [:div.tree
      [:pre (print-code tree)]
-     [:div {:style {:position :relative :transform (str "translateX(400px)")}}
+     [:div {:style {:position :relative}}
       [render-tidy tidy-tree]]]))
 
 (defn hello-world
@@ -76,7 +76,7 @@
   [:div
    [:h1 (:text @app-state)]
    (let [states (playback (inspect clj-lang program-1))]
-     (doall (for [tree (take 1 states)] [draw-tree tree])))])
+     (doall (for [tree (drop 1 (take 2 states))] [draw-tree tree])))])
 
 (reagent/render-component [hello-world]
                           (. js/document (getElementById "app")));

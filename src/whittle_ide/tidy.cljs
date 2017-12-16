@@ -69,7 +69,8 @@
   "Given a left contour and a right contour, return the point centered between
   their topmost limits."
   [lcontour rcontour]
-  (let [level (min (intersect-contour lcontour rcontour))]
+  (let [level (apply min (intersect-contour lcontour rcontour))]
+    (println "contour center" level (/ (- (get rcontour level) (get lcontour level)) 2))
     (/ (- (get rcontour level) (get lcontour level)) 2)))
 
 (defn find-lcontour
@@ -86,39 +87,36 @@
         (map (fn [[level x]] [level (+ x delta)]))
         contour))
 
-(defn max-overlap
+(defn pair-contours
   [left-tree-rcontour right-tree-lcontour]
   (let [common-levels (intersect-contour left-tree-rcontour right-tree-lcontour)]
-    (println (map list
-                  (map (partial get left-tree-rcontour)
-                       common-levels)
-
-                  (map (partial get right-tree-lcontour)
-                       common-levels)))
     (->> (map list
               (map (partial get left-tree-rcontour)
                    common-levels)
 
               (map (partial get right-tree-lcontour)
-                   common-levels))
-         (filter (partial apply >))
-         (map (partial apply -))
-         (apply max))))
+                   common-levels)))))
+
+(defn find-delta
+  [left-rcontour right-lcontour]
+  (let [pairs (pair-contours left-rcontour right-lcontour)]
+    (if-let [max-overlap (->> pairs
+                              (filter (partial apply >))
+                              (map (partial apply -))
+                              (apply max))]
+    max-overlap
+    0)))
 
 (def gap 40)
 
 (defn spread-trees
   [children]
   (reduce (fn [row child]
-            (let [overlap (max-overlap (find-rcontour row) (:lcontour child))
+            (let [overlap (find-delta (find-rcontour row) (:lcontour child))
                   delta   (+ (:delta (last row)) overlap gap)]
-              (println (:key child)
-                       (find-rcontour children)
-                       (:lcontour child)
-                       overlap)
               (conj row
                     (-> child
-                        (assoc :delta delta);; this delta value will be the final x coordinate
+                        (update :delta + delta);; this delta value will be the final x coordinate
                         (update :lcontour push-contour delta)
                         (update :rcontour push-contour delta)))))
           [(first children)]
@@ -143,7 +141,8 @@
         rcontour      (find-rcontour children)
         [min-x max-x] (center-node node (contour-center lcontour rcontour))]
     (-> node
-        (assoc :shift    min-x)
+        (assoc :shift min-x)
+        (assoc :delta min-x)
         (assoc :lcontour (assoc lcontour level min-x))
         (assoc :rcontour (assoc rcontour level max-x))
         (assoc :children children))))
@@ -159,7 +158,6 @@
 
 (defn replace-trees
   [loc args]
-  (println "replacing" (zip/node loc))
   (loop [loc loc]
     (let [loc' (-> loc
                    (zip/edit (fn [{:keys [children key level] :as node}]
