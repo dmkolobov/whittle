@@ -14,19 +14,19 @@
     (if-let [prev (zip/prev loc)] (recur prev) loc)))
 
 (defrecord LayoutNode
-  [key level label width height lcontour rcontour children delta shift])
+  [id level label width height lcontour rcontour children delta shift])
 
 (defn layout-node? [x] (instance? LayoutNode x))
 
 (defn make-child
-  [parse-tree & {:keys [measurements labels key-fn default-key level] :as args}]
+  [parse-tree & {:keys [measurements labels id-fn default-id level] :as args}]
   (if (layout-node? parse-tree)
     parse-tree
-    (let [key            (or (key-fn parse-tree) default-key)
-          [width height] (get measurements key)
-          label          (get labels key)]
+    (let [id             (or (id-fn parse-tree) default-id)
+          [width height] (get measurements id)
+          label          (get labels id)]
       (map->LayoutNode
-        {:key      key
+        {:id       id
          :level    level
          :label    label
 
@@ -185,13 +185,13 @@
   [loc args]
   (loop [loc loc]
     (let [loc' (-> loc
-                   (zip/edit (fn [{:keys [children key level] :as node}]
+                   (zip/edit (fn [{:keys [children id level] :as node}]
                                (assoc node
                                  :children
                                  (map-indexed #(apply make-child
                                                     %2
                                                     (concat args
-                                                            [:default-key (conj key %1)]
+                                                            [:default-id (conj id %1)]
                                                             [:level       (inc level)]))
                                               children)))))]
       (if (zip/end? (zip/next loc'))

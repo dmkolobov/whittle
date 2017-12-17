@@ -70,7 +70,7 @@
                   (println "made tidy")
                   (assoc db
                     :tidy-tree (tidy tree
-                                     :key-fn       tree-index
+                                     :id-fn       tree-index
                                      :labels       tree-labels
                                      :measurements tree-measures)
                     :tree-labels  {}
@@ -88,21 +88,20 @@
    label])
 
 (defn render-tidy
-  [{:keys [key]}]
+  [{:keys [id]}]
   (reagent/create-class
     {:component-did-mount
-     (fn [owner] (println "mounting node" key))
+     (fn [owner] (println "mounting node" id))
      :reagent-render
-     (fn [{:keys [key delta children shift label]
+     (fn [{:keys [id delta children shift label]
            :or   {delta 0}
            :as   node}]
-       (println "rendering" key)
-       ^{:key key}
+       (println "rendering" id)
        [:div.tidy-tree
-         ^{:key key} [render-node node]
+         [render-node node]
          (doall
            (map (fn [child]
-                  ^{:key (:key child)}
+                  ^{:key (:id child)}
                   [render-tidy (update child :delta + delta (- shift))])
                 children))])}))
 
@@ -120,6 +119,7 @@
   [labels]
   [:div
    (for [[index label] labels]
+     ^{:key index}
      [measure :child     label
               :on-measure #(dispatch [:measure-tree index %])])])
 
