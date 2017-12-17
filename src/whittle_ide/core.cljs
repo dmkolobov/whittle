@@ -37,9 +37,9 @@
   (into {}
         (map (fn [[index result]]
                [index
-                (cond (playback-node? result) [:pre (print-code (:result result))]
-                      (hiccup-tree? result)   [:pre (name (first result))]
-                      :default                [:pre (print-code result)])]))
+                (cond (playback-node? result) ^{:key "result"} [:pre (print-code (:result result))]
+                      (hiccup-tree? result)   ^{:key "node"} [:pre (name (first result))]
+                      :default                ^{:key "term"} [:pre (print-code result)])]))
         (index-tree result)))
 
 (defn all-measured?
@@ -52,7 +52,6 @@
               (fn [db [_ tree labels]]
                 (println "making tidy" tree labels)
                 (assoc db
-                  :tidy-tree     nil
                   :tree          tree
                   :tree-labels   labels
                   :tree-measures {})))
@@ -68,33 +67,44 @@
 (reg-event-db :layout-tree
               (fn [db]
                 (let [{:keys [tree tree-labels tree-measures]} db]
+                  (println "made tidy")
                   (assoc db
                     :tidy-tree (tidy tree
                                      :key-fn       tree-index
                                      :labels       tree-labels
-                                     :measurements tree-measures)))))
+                                     :measurements tree-measures)
+                    :tree-labels  {}
+                    :measurements {}))))
 
 (reg-sub :debug identity)
 (reg-sub :labels (fn [db] (get db :tree-labels)))
 (reg-sub :tidy-tree (fn [db] (get db :tidy-tree)))
 
+(defn render-node
+  [{:keys [label width delta level]}]
+  [:div.node
+   {:style {:width width
+            :transform (str "translate("delta"px,"(* level 50)"px)")}}
+   label])
+
 (defn render-tidy
-  [{:keys [delta children shift label width height level lcontour rcontour overlap]
-    :or   {delta 0}}]
-  [:div.tidy-tree
-   [:div.node
-    {:on-click  #(println "dimensions" width  height
-                          ;"overlap" overlap
-                          "delta" delta
-                          "shift" shift
-                          "center" (tidy/contour-center (dissoc lcontour level)
-                                                        (dissoc rcontour level)))
-     :style {:width width
-             :transform (str "translate("delta"px,"(* level 50)"px)")}}
-    label]
-   (doall
-     (map #(vector render-tidy (update % :delta + delta (- shift))); shift (- delta)))
-          children))])
+  [{:keys [key]}]
+  (reagent/create-class
+    {:component-did-mount
+     (fn [owner] (println "mounting node" key))
+     :reagent-render
+     (fn [{:keys [key delta children shift label]
+           :or   {delta 0}
+           :as   node}]
+       (println "rendering" key)
+       ^{:key key}
+       [:div.tidy-tree
+         ^{:key key} [render-node node]
+         (doall
+           (map (fn [child]
+                  ^{:key (:key child)}
+                  [render-tidy (update child :delta + delta (- shift))])
+                children))])}))
 
 (defn measure
   [& {:keys [child on-measure]}]
@@ -117,19 +127,18 @@
   [index tree]
   (let [labels    (subscribe [:labels])
         tidy-tree (subscribe [:tidy-tree])]
-    (fn [index tree]
-      ^{:key index}
-      [:div.tree {:key index}
+    (fn [tree]
+      [:div.tree
        ;[:pre (print-code tree)]
-       (if-let [tidy-tree @tidy-tree]
+       (when-let [labels @labels]
+         ^{:key index} [:div.hidden [measure-labels labels]])
+       (when-let [tidy-tree @tidy-tree]
          [:div.tidy-tree
           {:style {:transform "translateX(400px)"}}
-          ^{:key index} [render-tidy tidy-tree]]
-         (when-let [labels @labels] [:div.hidden [measure-labels labels]]))])))
+          [render-tidy tidy-tree]])])))
 
 (reg-sub :state
          (fn [{:keys [state states] :as db}]
-           (println "state" state)
            (get states state)))
 
 (reg-event-fx :advance-state
@@ -159,7 +168,6 @@
         state-idx (subscribe [:state-idx])]
     (dispatch [:register-states (playback (inspect clj-lang program-1))])
     (fn []
-      (println @state-idx)
       [:div
         (if-let [state @state]
           [:div
@@ -169,7 +177,7 @@
            [:a {:href "#"
                 :on-click #(do (.preventDefault %) (dispatch [:advance-state]))}
             "next"]
-           [:div ^{:key @state-idx} [draw-tree @state-idx state]]]
+           [:div [draw-tree @state-idx state]]]
           [:div "..."])])))
 
 (reagent/render-component [hello-world]
