@@ -1,5 +1,13 @@
 (ns whittle-ide.core
   (:require [cljs.pprint :refer [pprint] :as pprint]
+            ;[cljsjs.react]
+            ;[cljsjs.react-dom]
+            [cljsjs.react-transition-group]
+
+            ["react-transition-group/TransitionGroup" :as TransitionGroup]
+            ["react-transition-group/Transition" :as Transition]
+            ["react-transition-group/CSSTransition" :as CSSTransition]
+
             [reagent.core :as reagent :refer [atom]]
             [re-frame.core :refer [subscribe
                                    dispatch
@@ -16,13 +24,7 @@
             [clojure.string :as string]))
 
 (enable-console-print!)
-;;
-
-(def css-transition-group
-  (reagent/adapt-react-class js/React.addons.CSSTransitionGroup))
-
-(println css-transition-group)
-
+;;;;
 (defn print-code
   [code]
   (pprint/with-pprint-dispatch pprint/code-dispatch
@@ -170,15 +172,43 @@
    ;          :x2 child-x
    ;          :y2 child-y}])))]))
 
+(defn render-node-anim
+  [node state]
+  (println "state" state (:id node))
+  (reagent/as-element
+    [:div {:style {:opacity    (condp = state
+                                  "entering" 0
+                                  "entered"  1
+                                  "exiting"  0.99
+                                  "exited"   0)
+
+                   :transition (condp = state
+                                 "entering" "none"
+                                 "entered"  "opacity 0.2s ease-in"
+                                 "exiting"  "opacity 0.2s ease-out"
+                                 "exited"   "opacity 0.2s ease-out")}}
+   [render-node node]]))
+
+(def render-n
+  (reagent/reactify-component render-node-anim))
+
 (defn render
   [tidy]
-  (let [nodes (tidy/node-seq tidy)]
+  (let [max-level (max (count (:lcontour tidy)) (count (:rcontour tidy)))
+        nodes     (tidy/node-seq tidy)]
+    (println "max-level" max-level)
     [:div
      [:div.nodes
-      (doall
+      [:> TransitionGroup
+       {:component "div"}
+       (doall
         (for [{:keys [id level] :as node} nodes]
           ^{:key id}
-          [render-node node]))]
+          [:> Transition
+           {:timeout     {"enter"  (* level 200)
+                          "exit"   (* (- max-level level) 200)}
+            :appear      true}
+           (partial render-node-anim node)]))]]
      [:div.edges
       (doall
         (for [{:keys [id level] :as node} nodes]

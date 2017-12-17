@@ -10,10 +10,12 @@
   :dependencies [[org.clojure/clojure "1.9.0-beta4"]
                  [org.clojure/clojurescript "1.9.946"]
                  [org.clojure/core.async  "0.3.443"]
-                 [reagent "0.7.0" :exclusions [cljsjs/react]]
+                 [reagent "0.7.0" :exclusions [cljsjs/react cljsjs/react-dom]]
                  [re-frame "0.10.3-alpha2"]
-                 [cljsjs/react-with-addons "15.6.1-0"]
-                 [instaparse "1.4.8"]]
+                 [instaparse "1.4.8"]
+                 ;[cljsjs/react "15.6.2-2"]
+                 ;[cljsjs/react-dom "15.6.2-2"]
+                 [cljsjs/react-transition-group "2.2.0-0"]]
 
   :cljsbuild {:builds [{:id "none"
                         :source-paths ["src/"]
