@@ -119,3 +119,7 @@ svg {
     opacity: 0;
     transition: opacity 0.2s ease-out;
 }
+
+.mask {
+    background-color: #fff;
+}

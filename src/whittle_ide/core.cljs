@@ -173,21 +173,31 @@
    ;          :y2 child-y}])))]))
 
 (defn render-node-anim
-  [node state]
-  (println "state" state (:id node))
+  [{:keys [x y width height label]} state]
   (reagent/as-element
-    [:div {:style {:opacity    (condp = state
-                                  "entering" 0
-                                  "entered"  1
-                                  "exiting"  0.99
-                                  "exited"   0)
-
-                   :transition (condp = state
-                                 "entering" "none"
-                                 "entered"  "opacity 0.2s ease-in"
-                                 "exiting"  "opacity 0.2s ease-out"
-                                 "exited"   "opacity 0.2s ease-out")}}
-   [render-node node]]))
+    [:div.node
+     (update (translate x y)
+             :style
+             assoc
+             :position "absolute")
+     label
+     [:div.mask
+      (update (condp = state
+                        "entering" (translate (- width) 0)
+                        "entered"  (translate (- width) height)
+                        "exiting"  (translate (- width) 0)
+                        "exited"   (translate (- width) 0))
+              :style
+              assoc
+              :transition (condp = state
+                            "entering" "none"
+                            "entered"  "transform .2s ease-in"
+                            "exiting"  "transform .2s ease-in"
+                            "exited"   "none")
+              :position "absolute"
+              :width    width
+              :height   height
+              :display "inline-block")]]))
 
 (def render-n
   (reagent/reactify-component render-node-anim))
@@ -205,8 +215,8 @@
         (for [{:keys [id level] :as node} nodes]
           ^{:key id}
           [:> Transition
-           {:timeout     {"enter"  (* level 200)
-                          "exit"   (* (- max-level level) 200)}
+           {:timeout     {"enter"  (* (inc level) 200)
+                          "exit"   (* (inc (- max-level level)) 200)}
             :appear      true}
            (partial render-node-anim node)]))]]
      [:div.edges
