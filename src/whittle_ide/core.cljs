@@ -16,8 +16,6 @@
             [clojure.string :as string]))
 
 (enable-console-print!)
-
-(defonce app-state (atom {:text "Hello world!"}))
 ;;
 
 (defn print-code
@@ -52,9 +50,12 @@
 
 (reg-event-db :make-tidy
               (fn [db [_ tree labels]]
-                {:tree          tree
-                 :tree-labels   labels
-                 :tree-measures {}}))
+                (println "making tidy" tree labels)
+                (assoc db
+                  :tidy-tree     nil
+                  :tree          tree
+                  :tree-labels   labels
+                  :tree-measures {})))
 
 (reg-event-fx :measure-tree
               (fn [{:keys [db]} [_ index bounds]]
@@ -74,6 +75,7 @@
                                      :measurements tree-measures)))))
 
 (reg-sub :debug identity)
+(reg-sub :labels (fn [db] (get db :tree-labels)))
 (reg-sub :tidy-tree (fn [db] (get db :tidy-tree)))
 
 (defn render-tidy
@@ -112,29 +114,63 @@
               :on-measure #(dispatch [:measure-tree index %])])])
 
 (defn draw-tree
-  [tree]
-  (let [debug     (subscribe [:debug])
-        labels    (label-tree tree)
+  [index tree]
+  (let [labels    (subscribe [:labels])
         tidy-tree (subscribe [:tidy-tree])]
-    (dispatch [:make-tidy tree labels])
-    (fn [tree]
-      [:div.tree
-       [:pre (print-code tree)]
+    (fn [index tree]
+      ^{:key index}
+      [:div.tree {:key index}
+       ;[:pre (print-code tree)]
        (if-let [tidy-tree @tidy-tree]
          [:div.tidy-tree
-          {:style
-           {:transform "translateX(400px)"}}
-          [render-tidy tidy-tree]]
-         [:div.hidden
-          [:h2 "Preparing tree"] ;])])))
-          [measure-labels labels]])])))
+          {:style {:transform "translateX(400px)"}}
+          ^{:key index} [render-tidy tidy-tree]]
+         (when-let [labels @labels] [:div.hidden [measure-labels labels]]))])))
+
+(reg-sub :state
+         (fn [{:keys [state states] :as db}]
+           (println "state" state)
+           (get states state)))
+
+(reg-event-fx :advance-state
+              (fn [{:keys [db]}]
+                (let [idx  (inc (:state db))
+                      tree (get-in db [:states idx])]
+                  {:db       (assoc db :state idx)
+                   :dispatch [:make-tidy tree (label-tree tree)]})))
+
+(reg-event-fx :rewind-state
+              (fn [{:keys [db]}]
+                (let [idx  (dec (:state db))
+                      tree (get-in db [:states idx])]
+                  {:db       (assoc db :state idx)
+                   :dispatch [:make-tidy tree (label-tree tree)]})))
+
+(reg-event-db :register-states (fn [db [_ states]]
+                                 (assoc db
+                                   :state  0
+                                   :states (vec states))))
+
+(reg-sub :state-idx (fn [db] (get db :state)))
 
 (defn hello-world
   []
-  [:div
-   [:h1 (:text @app-state)]
-   (let [states (playback (inspect clj-lang program-1))]
-     (doall (for [tree (drop 0 (take 1 states))] [draw-tree tree])))])
+  (let [state (subscribe [:state])
+        state-idx (subscribe [:state-idx])]
+    (dispatch [:register-states (playback (inspect clj-lang program-1))])
+    (fn []
+      (println @state-idx)
+      [:div
+        (if-let [state @state]
+          [:div
+           [:a {:href "#"
+                :on-click #(do (.preventDefault %) (dispatch [:rewind-state]))}
+            "prev"]
+           [:a {:href "#"
+                :on-click #(do (.preventDefault %) (dispatch [:advance-state]))}
+            "next"]
+           [:div ^{:key @state-idx} [draw-tree @state-idx state]]]
+          [:div "..."])])))
 
 (reagent/render-component [hello-world]
                           (. js/document (getElementById "app")))

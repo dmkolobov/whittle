@@ -115,11 +115,6 @@
 
 (def gap 10)
 
-(defn init-shift
-  [{:keys [width] :as node}]
-  (-> node
-      (update :delta - (/ width 2))))
-
 (defn spread-trees
   [children]
   (let [[first & siblings] children]
