@@ -218,7 +218,7 @@
       (recur
         (-> loc
             (zip/edit (fn [{:keys [delta shift level width height] :as node}]
-                        (let [y           (* level 50)
+                        (let [y           (* level 33)
                               edge-origin [(+ delta (/ width 2))
                                            (+ y height)]]
                           (-> node

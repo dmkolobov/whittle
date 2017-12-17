@@ -18,6 +18,9 @@
 (enable-console-print!)
 ;;
 
+(def css-transition-group
+  (reagent/adapt-react-class js/React.addons.CSSTransitionGroup))
+
 (defn print-code
   [code]
   (pprint/with-pprint-dispatch pprint/code-dispatch
@@ -37,9 +40,9 @@
   (into {}
         (map (fn [[index result]]
                [index
-                (cond (playback-node? result) ^{:key "result"} [:pre (print-code (:result result))]
-                      (hiccup-tree? result)   ^{:key "node"} [:pre (name (first result))]
-                      :default                ^{:key "term"} [:pre (print-code result)])]))
+                (cond (playback-node? result) ^{:key "result"} [:pre [:code (print-code (:result result))]]
+                      (hiccup-tree? result)   ^{:key "node"} [:pre.black [:code (name (first result))]]
+                      :default                ^{:key "term"} [:pre [:code (print-code result)]])]))
         (index-tree result)))
 
 (defn all-measured?
@@ -82,27 +85,21 @@
 
 (defn translate
   [x y]
-  {:style {:position  "absolute"
-           :transform (str "translate("x"px,"y"px)")}})
+  {:style {:transform (str "translate("x"px,"y"px)")}})
 
 (defn render-node
   [{:keys [label width x y height]}]
   [:div.node
-   (update (translate x y)
-           :style
-           assoc
-           :width  width
-           :height height)
-   label])
+   (translate x y) label])
 
 (defn view-box
   [points & {:keys [min-width min-height]}]
   (let [xs     (map first points)
         ys     (map second points)
         top    (apply min ys)
-        right  (apply max xs)
+        right  (+ (apply max xs) 5)
         bottom (apply max ys)
-        left   (apply min xs)]
+        left   (- (apply min xs) 5)]
     {:top    (if (= top bottom) (+ top (/ min-height -2)) top)
      :left   (if (= left right) (+ left (/ min-width -2)) left)
      :bottom  (if (= top bottom) (+ top (/ min-height 2)) bottom)
@@ -116,33 +113,60 @@
   [{:keys [x y width]}]
   [(+ x (/ width 2)) y])
 
+(defn render-segment
+  [x y child]
+  (let [[child-x child-y] (child-connection child)]
+    [:path
+     {:stroke "#000"
+      :fill "none"
+      :stroke-width 1
+      :vector-effect "non-scaling-stroke"
+      :d (string/join " "
+                      ["M" x y
+                       "L" child-x y
+                       "L" child-x child-y])}]))
+
 (defn render-edges
   [{:keys [width height x y children] :as node}]
   (let [parent-conn (parent-connection node)
         child-conns (map child-connection children)
         {:keys [top left bottom right] :as vb} (view-box (conj child-conns parent-conn)
-                                                         :min-width 10)]
+                                                         :min-width 10)
+        width  (- right left)
+        height (- bottom top)
+        [parent-x parent-y] parent-conn]
     [:svg
      (-> (translate left top)
-         (assoc :width  (- right left)
-                :height (- bottom top)
+         (assoc :width  width
+                :height height
                 :viewBox (string/join " " [left top (- right left) (- bottom top)]))
          (update :style
                  assoc
                  :position         "absolute"
                  :background-color "rgba(0,0,0,0)"))
+     [:path
+      {:stroke "#000"
+       :fill "none"
+       :stroke-width 1
+       :d (string/join " "
+                       ["M" parent-x parent-y
+                        "L" parent-x parent-y
+                        "L" parent-x (+ parent-y (/ height 2))])}]
      (doall
        (for [{:keys [id] :as child} children]
-         (let [[parent-x parent-y] parent-conn
-               [child-x child-y]   (child-connection child)]
-           ^{:key (str "edge:" id)}
-           [:line
-            {:stroke "#000"
-             :stroke-width 1
-             :x1 parent-x
-             :y1 parent-y
-             :x2 child-x
-             :y2 child-y}])))]))
+         ^{:key id}
+         [render-segment parent-x (+ parent-y (/ height 2)) child]))]))
+   ;  (doall
+   ;    (for [{:keys [id] :as child} children]
+   ;      (let [[child-x child-y]   (child-connection child)]
+   ;        ^{:key (str "edge:" id)}
+   ;        [:line
+   ;         {:stroke "#000"
+   ;          :stroke-width 1
+   ;          :x1 parent-x
+   ;          :y1 parent-y
+   ;          :x2 child-x
+   ;          :y2 child-y}])))]))
 
 (defn render-tidy
   [{:keys [id]}]
@@ -168,7 +192,7 @@
      (fn [owner]
        (let [dom  (reagent/dom-node owner)
              rect (.getBoundingClientRect dom)]
-         (on-measure [(.-width rect) (.-height rect)])))
+         (on-measure [(.-offsetWidth dom) (.-offsetHeight dom)])))
      :reagent-render (fn [& _] child)}))
 
 (defn measure-labels
@@ -185,7 +209,6 @@
         tidy-tree (subscribe [:tidy-tree])]
     (fn [tree]
       [:div.tree
-       ;[:pre (print-code tree)]
        (when-let [labels @labels]
          ^{:key index} [:div.hidden [measure-labels labels]])
        (when-let [tidy-tree @tidy-tree]
@@ -220,18 +243,19 @@
 (reg-sub :state-idx (fn [db] (get db :state)))
 
 (def exp-1
-  "2 + (2 - 2) + 4 + 6 + 7")
+  "(2 + (5 - 4) * (2 - 2) + 4) * 5 + 6 + 7")
 
 (defn hello-world
   []
   (let [state (subscribe [:state])
         state-idx (subscribe [:state-idx])]
-    (dispatch [:register-states (playback (inspect lang exp-1))])
+    (dispatch [:register-states (playback (inspect clj-lang exp-1))])
                                 ;(playback (inspect clj-lang program-1))])
     (println "exp"
              (playback (inspect lang exp-1)))
     (fn []
       [:div
+       [:pre [:code exp-1]]
         (if-let [state @state]
           [:div
            [:a {:href "#"
