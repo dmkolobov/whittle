@@ -172,9 +172,11 @@
         ;(update :rcontour assoc level max-x)
         (assoc :children children))))
 
+(defn node-branch? [x] (and (layout-node? x) (seq (:children x))))
+
 (defn layout-zipper
   [parse-tree args]
-  (zip/zipper (fn branch? [x] (and (layout-node? x) (seq (:children x))))
+  (zip/zipper node-branch?
               (fn [{:keys [children]}] children)
               #(assoc %1 :children %2)
               (if (layout-node? parse-tree)
@@ -231,6 +233,22 @@
                                                  (update :delta + delta (- shift))))
                                            children)))))))
             (zip/next))))))
+
+(defn node-seq-zipper
+  [tidy]
+  (zip/zipper node-branch?
+              :children
+              #(assoc %1 :children %2)
+              tidy))
+
+(defn node-seq
+  [tidy]
+  (loop [nodes []
+         loc   (node-seq-zipper tidy)]
+    (if (zip/end? loc)
+      nodes
+      (recur (conj nodes (zip/node loc))
+             (zip/next loc)))))
 
 (defn tidy
   [tree & args]

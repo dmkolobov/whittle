@@ -21,6 +21,8 @@
 (def css-transition-group
   (reagent/adapt-react-class js/React.addons.CSSTransitionGroup))
 
+(println css-transition-group)
+
 (defn print-code
   [code]
   (pprint/with-pprint-dispatch pprint/code-dispatch
@@ -168,22 +170,20 @@
    ;          :x2 child-x
    ;          :y2 child-y}])))]))
 
-(defn render-tidy
-  [{:keys [id]}]
-  (reagent/create-class
-    {:component-did-mount
-     (fn [owner] (println "mounting node" id))
-     :reagent-render
-     (fn [{:keys [id delta children shift label]
-           :or   {delta 0}
-           :as   node}]
-       [:div.tidy-tree
-         [render-node node]
-        (when (seq children)
-          [render-edges node])
-         (doall
-           (map (fn [child] ^{:key (:id child)} [render-tidy child])
-                children))])}))
+(defn render
+  [tidy]
+  (let [nodes (tidy/node-seq tidy)]
+    [:div
+     [:div.nodes
+      (doall
+        (for [{:keys [id level] :as node} nodes]
+          ^{:key id}
+          [render-node node]))]
+     [:div.edges
+      (doall
+        (for [{:keys [id level] :as node} nodes]
+          ^{:key id}
+          [render-edges node]))]]))
 
 (defn measure
   [& {:keys [child on-measure]}]
@@ -215,7 +215,7 @@
          [:div.tidy-tree
           {:style {:position "relative"
                    :transform "translateX(400px)"}}
-          [render-tidy tidy-tree]])])))
+          [render tidy-tree]])])))
 
 (reg-sub :state
          (fn [{:keys [state states] :as db}]
