@@ -11,6 +11,7 @@
                  [org.clojure/clojurescript "1.9.946"]
                  [org.clojure/core.async  "0.3.443"]
                  [reagent "0.7.0"]
+                 [re-frame "0.10.3-alpha2"]
                  [instaparse "1.4.8"]]
 
   :cljsbuild {:builds [{:id "none"

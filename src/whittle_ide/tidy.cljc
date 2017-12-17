@@ -30,7 +30,8 @@
          :level    level
          :label    label
 
-         :delta    0
+         ;:delta    (- (/ width 2))
+         ;:shift    (/ width 2)
          :width    width
          :height   height
 
@@ -70,16 +71,21 @@
   their topmost limits."
   [lcontour rcontour]
   (let [level (apply min (intersect-contour lcontour rcontour))]
-    (println "contour center" level (/ (- (get rcontour level) (get lcontour level)) 2))
-    (/ (- (get rcontour level) (get lcontour level)) 2)))
+    (/ (- (get rcontour level) (get lcontour level)) 2.0)))
 
 (defn find-lcontour
   [children]
-  (reduce (partial merge-f min) {} (map :lcontour children)))
+  (reduce (partial merge-f min)
+          {}
+          (concat (map :lcontour children)
+                  (map :rcontour children))))
 
 (defn find-rcontour
   [children]
-  (reduce (partial merge-f max) {} (map :rcontour children)))
+  (reduce (partial merge-f max)
+          {}
+          (concat (map :lcontour children)
+                  (map :rcontour children))))
 
 (defn push-contour
   [contour delta]
@@ -90,37 +96,49 @@
 (defn pair-contours
   [left-tree-rcontour right-tree-lcontour]
   (let [common-levels (intersect-contour left-tree-rcontour right-tree-lcontour)]
-    (->> (map list
-              (map (partial get left-tree-rcontour)
-                   common-levels)
+    (map list
+         (map (partial get left-tree-rcontour)
+              common-levels)
 
-              (map (partial get right-tree-lcontour)
-                   common-levels)))))
+         (map (partial get right-tree-lcontour)
+              common-levels))))
 
 (defn find-delta
   [left-rcontour right-lcontour]
   (let [pairs (pair-contours left-rcontour right-lcontour)]
     (if-let [max-overlap (->> pairs
-                              (filter (partial apply >))
+                              (filter (partial apply >=))
                               (map (partial apply -))
                               (apply max))]
-    max-overlap
-    0)))
+      max-overlap
+      0)))
 
-(def gap 40)
+(def gap 10)
+
+(defn init-shift
+  [{:keys [width] :as node}]
+  (-> node
+      (update :delta - (/ width 2))))
 
 (defn spread-trees
   [children]
-  (reduce (fn [row child]
-            (let [overlap (find-delta (find-rcontour row) (:lcontour child))
-                  delta   (+ (:delta (last row)) overlap gap)]
-              (conj row
-                    (-> child
-                        (update :delta + delta);; this delta value will be the final x coordinate
-                        (update :lcontour push-contour delta)
-                        (update :rcontour push-contour delta)))))
-          [(first children)]
-          (rest children)))
+  (let [[first & siblings] children]
+    (if (seq siblings)
+      (reduce (fn [row {:keys [width] :as child}]
+                (let [last-dt (:delta (last row))
+                      overlap (find-delta (push-contour (find-rcontour row)
+                                                        (- last-dt))
+                                          (:lcontour child))
+                      delta   (+ last-dt overlap gap)]
+                  (conj row
+                        (-> child
+                            (assoc :overlap overlap)
+                            (update :delta + delta);; this delta value will be the final x coordinate
+                            (update :lcontour push-contour delta)
+                            (update :rcontour push-contour delta)))))
+              [first]
+              siblings)
+      [first])))
 
 ;;   a
 ;;  / \
@@ -132,19 +150,31 @@
   "Returns a vector [min-x max-x] representing the x-bounds of the given node
    when centered horizontally about 'x'."
   [{:keys [width]} x]
-  [(- x (/ width 2)) (+ x (/ width 2))])
+  [(- x (/ width 2.0))
+   (+ x (/ width 2.0))])
 
 (defn layout-node
-  [{:keys [level] :as node} children]
+  [{:keys [level width] :as node} children]
   (let [children      (spread-trees children)
         lcontour      (find-lcontour children)
         rcontour      (find-rcontour children)
         [min-x max-x] (center-node node (contour-center lcontour rcontour))]
     (-> node
         (assoc :shift min-x)
-        (assoc :delta min-x)
-        (assoc :lcontour (assoc lcontour level min-x))
-        (assoc :rcontour (assoc rcontour level max-x))
+        ;(assoc :delta (- width))
+        ;(assoc :delta 0)
+        (assoc :lcontour
+               (push-contour (assoc lcontour level min-x)
+                             (- min-x)))
+        (assoc :rcontour
+               (push-contour (assoc rcontour level max-x)
+                             (- min-x)))
+        ;(assoc :lcontour lcontour)
+        ;(assoc :rcontour rcontour)
+        ;(update :lcontour push-contour (- max-x))
+        ;(update :rcontour push-contour (- min-x))
+        ;(update :lcontour assoc level min-x)
+        ;(update :rcontour assoc level max-x)
         (assoc :children children))))
 
 (defn layout-zipper
