@@ -2,7 +2,7 @@
   (:require [clojure.zip :as zip]
             [instaparse.core :as insta]
             [whittle.transform :refer [merge-meta]]
-            [whittle.core :refer [whittle]]))
+            [whittle.core :refer [whittle parse]]))
 
 (defrecord PlaybackNode [index result])
 
@@ -38,7 +38,9 @@
   (let [changes (atom [])
         g       (whittle f {:hooks {:after (partial inspect-hook changes)}})
         result  (g source)
-        ast     (:ast (meta result))]
+        ast     (if-let [ast (:ast (meta result))]
+                  ast
+                  (parse f source))]
     {:source  source
      :changes @changes
      :ast     ast

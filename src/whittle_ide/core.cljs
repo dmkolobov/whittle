@@ -80,12 +80,69 @@
 (reg-sub :labels (fn [db] (get db :tree-labels)))
 (reg-sub :tidy-tree (fn [db] (get db :tidy-tree)))
 
+(defn translate
+  [x y]
+  {:style {:position  "absolute"
+           :transform (str "translate("x"px,"y"px)")}})
+
 (defn render-node
-  [{:keys [label width delta level]}]
+  [{:keys [label width x y height]}]
   [:div.node
-   {:style {:width width
-            :transform (str "translate("delta"px,"(* level 50)"px)")}}
+   (update (translate x y)
+           :style
+           assoc
+           :width  width
+           :height height)
    label])
+
+(defn view-box
+  [points & {:keys [min-width min-height]}]
+  (let [xs     (map first points)
+        ys     (map second points)
+        top    (apply min ys)
+        right  (apply max xs)
+        bottom (apply max ys)
+        left   (apply min xs)]
+    {:top    (if (= top bottom) (+ top (/ min-height -2)) top)
+     :left   (if (= left right) (+ left (/ min-width -2)) left)
+     :bottom  (if (= top bottom) (+ top (/ min-height 2)) bottom)
+     :right (if (= left right) (+ left (/ min-width 2)) right)}))
+
+(defn parent-connection
+  [{:keys [x y width height]}]
+  [(+ x (/ width 2)) (+ y height)])
+
+(defn child-connection
+  [{:keys [x y width]}]
+  [(+ x (/ width 2)) y])
+
+(defn render-edges
+  [{:keys [width height x y children] :as node}]
+  (let [parent-conn (parent-connection node)
+        child-conns (map child-connection children)
+        {:keys [top left bottom right] :as vb} (view-box (conj child-conns parent-conn)
+                                                         :min-width 10)]
+    [:svg
+     (-> (translate left top)
+         (assoc :width  (- right left)
+                :height (- bottom top)
+                :viewBox (string/join " " [left top (- right left) (- bottom top)]))
+         (update :style
+                 assoc
+                 :position         "absolute"
+                 :background-color "rgba(0,0,0,0)"))
+     (doall
+       (for [{:keys [id] :as child} children]
+         (let [[parent-x parent-y] parent-conn
+               [child-x child-y]   (child-connection child)]
+           ^{:key (str "edge:" id)}
+           [:line
+            {:stroke "#000"
+             :stroke-width 1
+             :x1 parent-x
+             :y1 parent-y
+             :x2 child-x
+             :y2 child-y}])))]))
 
 (defn render-tidy
   [{:keys [id]}]
@@ -96,13 +153,12 @@
      (fn [{:keys [id delta children shift label]
            :or   {delta 0}
            :as   node}]
-       (println "rendering" id)
        [:div.tidy-tree
          [render-node node]
+        (when (seq children)
+          [render-edges node])
          (doall
-           (map (fn [child]
-                  ^{:key (:id child)}
-                  [render-tidy (update child :delta + delta (- shift))])
+           (map (fn [child] ^{:key (:id child)} [render-tidy child])
                 children))])}))
 
 (defn measure
@@ -134,7 +190,8 @@
          ^{:key index} [:div.hidden [measure-labels labels]])
        (when-let [tidy-tree @tidy-tree]
          [:div.tidy-tree
-          {:style {:transform "translateX(400px)"}}
+          {:style {:position "relative"
+                   :transform "translateX(400px)"}}
           [render-tidy tidy-tree]])])))
 
 (reg-sub :state
@@ -162,11 +219,17 @@
 
 (reg-sub :state-idx (fn [db] (get db :state)))
 
+(def exp-1
+  "2 + (2 - 2) + 4 + 6 + 7")
+
 (defn hello-world
   []
   (let [state (subscribe [:state])
         state-idx (subscribe [:state-idx])]
-    (dispatch [:register-states (playback (inspect clj-lang program-1))])
+    (dispatch [:register-states (playback (inspect lang exp-1))])
+                                ;(playback (inspect clj-lang program-1))])
+    (println "exp"
+             (playback (inspect lang exp-1)))
     (fn []
       [:div
         (if-let [state @state]

@@ -47,7 +47,7 @@
                    (if (insta/failure? ast)
                      (throw (ex-info "Parser error" {:ast ast}))
                      (transform-ast transforms ast template hooks))))
-               lang)))
+               (assoc lang :parse parse))))
 
 (defn keep-hidden
   [grammar node f & args]
@@ -80,3 +80,7 @@
     (if (fn? f)
       (reduce extend-lang (meta f) exts)
       (reduce extend-lang {:transforms {}} (conj exts f)))))
+
+(defn parse
+  [f source]
+  ((:parse (meta f)) source))

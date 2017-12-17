@@ -208,11 +208,34 @@
     (recur prev)
     (if-let [up (zip/up loc')]
       (recur up)
-      (zip/node loc')))))
+      loc'))))
+
+(defn position-nodes
+  [loc]
+  (loop [loc loc]
+    (if (zip/end? loc)
+      (zip/root loc)
+      (recur
+        (-> loc
+            (zip/edit (fn [{:keys [delta shift level width height] :as node}]
+                        (let [y           (* level 50)
+                              edge-origin [(+ delta (/ width 2))
+                                           (+ y height)]]
+                          (-> node
+                            (assoc :x delta :y y)
+                            (update :children
+                                    (fn [children]
+                                      (map (fn [child]
+                                             (-> child
+                                                 (assoc :edge-origin edge-origin)
+                                                 (update :delta + delta (- shift))))
+                                           children)))))))
+            (zip/next))))))
 
 (defn tidy
   [tree & args]
   (-> tree
       (layout-zipper args)
       (replace-trees args)
-      (replace-nodes)))
+      (replace-nodes)
+      (position-nodes)))
