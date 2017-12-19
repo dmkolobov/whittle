@@ -120,6 +120,14 @@ svg {
     transition: opacity 0.2s ease-out;
 }
 
-.mask {
+line {
+    position: absolute;
+    stroke: #000;
+}
+
+.v-mask, .h-mask {
+    position: absolute;
     background-color: #fff;
+    width: 1000px;
+    height: 1000px;
 }

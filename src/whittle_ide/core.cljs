@@ -16,6 +16,7 @@
                                    reg-event-fx]]
 
             [whittle.core :refer [whittle]]
+            [whittle.paint-rect :as paint-rect]
             [whittle.lang.arithmetic :refer [lang clj-lang]]
             [whittle.inspect :refer [inspect playback index-tree tree-index playback-node? hiccup-tree?]]
             [whittle-ide.tidy :refer [tidy] :as tidy]
@@ -57,7 +58,6 @@
 
 (reg-event-db :make-tidy
               (fn [db [_ tree labels]]
-                (println "making tidy" tree labels)
                 (assoc db
                   :tree          tree
                   :tree-labels   labels
@@ -74,7 +74,6 @@
 (reg-event-db :layout-tree
               (fn [db]
                 (let [{:keys [tree tree-labels tree-measures]} db]
-                  (println "made tidy")
                   (assoc db
                     :tidy-tree (tidy tree
                                      :id-fn       tree-index
@@ -172,6 +171,126 @@
    ;          :x2 child-x
    ;          :y2 child-y}])))]))
 
+(def edge-stroke 1)
+
+(defn box
+  [points & {:keys [margin-top margin-bottom margin-left margin-right]
+             :or   {margin-top 0
+                    margin-bottom 0
+                    margin-left 0
+                    margin-right 0}}]
+  (let [xs    (map first points)
+        ys    (map last points)
+        min-x (apply min xs)
+        min-y (apply min ys)
+        max-x (apply max xs)
+        max-y (apply max ys)]
+    {:top    (- min-y margin-top)
+     :bottom (+ max-y margin-bottom)
+     :left   (- min-x margin-left)
+     :right  (+ max-x margin-right)
+     :width  (+ (- max-x min-x) margin-left margin-right)
+     :height (+ (- max-y min-y) margin-top margin-bottom)}))
+
+(defn ts
+  [x y]
+  (str "translate("x"px,"y"px)"))
+
+(defn transit
+  [duration ease delay]
+  (str "transform " duration "s " ease " " delay "s"))
+
+(defn masked
+  [& {:keys [x
+             y
+             width
+             height
+             component
+             child
+             duration ease delay]
+      :or {component :div}
+      :as spec}]
+  [component
+   {:style {:transform   (translate x y)
+            :transition  (transit duration ease delay)}}
+   [component
+    {:style {:transform  (translate (- x) (- y))
+             :transition (transit duration ease delay)}}
+    child]])
+
+(defn move
+  [x y]
+  {:style {:transform (paint-rect/translate x y)}})
+
+(def stem-stroke 4)
+(def stem-height 7)
+
+(def v-line
+  [:svg.node
+   {:width stem-stroke :height "1000"}
+   [:line {:stroke-width stem-stroke
+           :x1 (/ stem-stroke 2) :y1 0
+           :x2 (/ stem-stroke 2) :y2 1000}]])
+
+(def h-line
+  [:svg.node
+   {:width "1000" :height stem-stroke}
+   [:line {:stroke-width stem-stroke
+           :y1 (/ stem-stroke 2) :x1 0
+           :y2 (/ stem-stroke 2) :x2 1000}]])
+
+
+(defn node->rects
+  [baseline {:keys [id y width height children label level]
+             :or   {y 0}
+             :as   node}]
+  (let []
+    (->> [(when (not= level 0)
+            {:id     [:node-root id]
+             :width  stem-stroke
+             :height (+ stem-height y)
+             :child  v-line})
+          {:id     [:node-body id]
+           :width  width
+           :height height
+           :child  label}
+          (when (seq children)
+            (let [cxs   (map paint-rect/center-x children)
+                  min-x (apply min cxs)
+                  max-x (apply max cxs)
+                  width (- max-x min-x)]
+              [{:id     [:node-stem-v id]
+                :width  stem-stroke
+                :height stem-height
+                :child  v-line}
+               {:id     [:node-stem-h id]
+                :width  (+ width stem-stroke)
+                :height stem-stroke
+                :child  h-line}]))]
+         (flatten)
+         (filter some?)
+         (paint-rect/center (paint-rect/center-x node))
+         (paint-rect/space baseline))))
+
+(defn draw-tidy
+  [tidy]
+  (let [rows  (group-by :level (tidy/node-seq tidy))
+        plist (loop [baseline 0
+                     rows     rows
+                     rects    []]
+                (if (seq rows)
+                  (let [[_ nodes] (first rows)
+                        row-rects (mapcat #(node->rects baseline %) nodes)]
+                    (recur (apply paint-rect/find-baseline row-rects)
+                           (rest rows)
+                           (into rects row-rects)))
+                  (paint-rect/paint-list rects)))]
+    (println (map :id plist))
+    [:div
+     (for [r plist]
+       ^{:key (:id r)}
+       [paint-rect/paint-rect r])]))
+
 (defn render-node-anim
   [{:keys [x y width height label]} state]
   (reagent/as-element
@@ -202,11 +321,16 @@
 (def render-n
   (reagent/reactify-component render-node-anim))
 
+
 (defn render
   [tidy]
   (let [max-level (max (count (:lcontour tidy)) (count (:rcontour tidy)))
-        nodes     (tidy/node-seq tidy)]
-    (println "max-level" max-level)
+        nodes     (tidy/node-seq tidy)
+        nodes     (->> nodes
+                       (group-by :level)
+                       (sort-by first)
+                       (vals)
+                       (apply concat))]
     [:div
      [:div.nodes
       [:> TransitionGroup
@@ -215,8 +339,8 @@
         (for [{:keys [id level] :as node} nodes]
           ^{:key id}
           [:> Transition
-           {:timeout     {"enter"  (* (inc level) 200)
-                          "exit"   (* (inc (- max-level level)) 200)}
+           {:timeout     {"enter"  (* (inc level) 200 2)
+                          "exit"   (* (inc (- max-level level)) 200 2)}
             :appear      true}
            (partial render-node-anim node)]))]]
      [:div.edges
@@ -255,7 +379,7 @@
          [:div.tidy-tree
           {:style {:position "relative"
                    :transform "translateX(400px)"}}
-          [render tidy-tree]])])))
+          [draw-tidy tidy-tree]])])))
 
 (reg-sub :state
          (fn [{:keys [state states] :as db}]
@@ -291,8 +415,6 @@
         state-idx (subscribe [:state-idx])]
     (dispatch [:register-states (playback (inspect clj-lang exp-1))])
                                 ;(playback (inspect clj-lang program-1))])
-    (println "exp"
-             (playback (inspect lang exp-1)))
     (fn []
       [:div
        [:pre [:code exp-1]]
@@ -306,6 +428,32 @@
             "next"]
            [:div [draw-tree @state-idx state]]]
           [:div "..."])])))
+
+(defn test-concept
+  []
+  (let [state (reagent/atom 0)]
+    (fn []
+      @state
+      [:div
+       [:a {:href "#" :on-click (fn [_] (swap! state inc))} "shuffle"]
+        [:> TransitionGroup
+         {:component :ul}
+         (doall
+           (for [x (->> '[a b c d e] (shuffle) (random-sample 0.5))]
+             ^{:key x}
+             [:> Transition
+              {:timeout     {"enter" 3000
+                             "exit"  3000}
+               :appear      true}
+              (fn [state]
+                (reagent/as-element
+                  [:li
+                   {:style {:opacity (if (= state "entered")
+                                        1
+                                        0)
+                            :transition "opacity 1s ease-in"}}
+                   (str x)]))]))]])))
+
 
 (reagent/render-component [hello-world]
                           (. js/document (getElementById "app")))

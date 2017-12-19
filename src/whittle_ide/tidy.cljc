@@ -113,7 +113,7 @@
       max-overlap
       0)))
 
-(def gap 10)
+(def gap 20)
 
 (defn spread-trees
   [children]
@@ -224,7 +224,7 @@
                               edge-origin [(+ delta (/ width 2))
                                            (+ y height)]]
                           (-> node
-                            (assoc :x delta :y y)
+                            (assoc :x delta)
                             (update :children
                                     (fn [children]
                                       (map (fn [child]
