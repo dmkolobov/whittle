@@ -51,7 +51,7 @@
 
 (defn center
   "Centers the given rects about x"
-  [x rects]
+  [x & rects]
   (map (fn [{:keys [width] :as rect}]
          (assoc rect :x (- x (/ width 2))))
        rects))

@@ -131,3 +131,9 @@ line {
     width: 1000px;
     height: 1000px;
 }
+
+.black-canvas {
+    background-color: #000;
+    width:  1000px;
+    height: 1000px;
+}

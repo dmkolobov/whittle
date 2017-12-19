@@ -16,7 +16,7 @@
                                    reg-event-fx]]
 
             [whittle.core :refer [whittle]]
-            [whittle.paint-rect :as paint-rect]
+            [whittle.paint-rect :as paint-rect :refer [center]]
             [whittle.lang.arithmetic :refer [lang clj-lang]]
             [whittle.inspect :refer [inspect playback index-tree tree-index playback-node? hiccup-tree?]]
             [whittle-ide.tidy :refer [tidy] :as tidy]
@@ -225,51 +225,41 @@
 (def stem-stroke 4)
 (def stem-height 7)
 
-(def v-line
-  [:svg.node
-   {:width stem-stroke :height "1000"}
-   [:line {:stroke-width stem-stroke
-           :x1 (/ stem-stroke 2) :y1 0
-           :x2 (/ stem-stroke 2) :y2 1000}]])
-
-(def h-line
-  [:svg.node
-   {:width "1000" :height stem-stroke}
-   [:line {:stroke-width stem-stroke
-           :y1 (/ stem-stroke 2) :x1 0
-           :y2 (/ stem-stroke 2) :x2 1000}]])
-
+(def black [:div.black-canvas])
 
 (defn node->rects
   [baseline {:keys [id y width height children label level]
              :or   {y 0}
              :as   node}]
-  (let []
+  (let [cx (paint-rect/center-x node)]
     (->> [(when (not= level 0)
-            {:id     [:node-root id]
-             :width  stem-stroke
-             :height (+ stem-height y)
-             :child  v-line})
-          {:id     [:node-body id]
-           :width  width
-           :height height
-           :child  label}
+            (center cx
+                    {:id     [:node-root id]
+                     :width  stem-stroke
+                     :height (+ stem-height y)
+                     :child  black}))
+          (center cx
+                  {:id     [:node-body id]
+                   :width  width
+                   :height height
+                   :child  label})
           (when (seq children)
             (let [cxs   (map paint-rect/center-x children)
                   min-x (apply min cxs)
                   max-x (apply max cxs)
                   width (- max-x min-x)]
-              [{:id     [:node-stem-v id]
-                :width  stem-stroke
-                :height stem-height
-                :child  v-line}
+              [(center cx
+                       {:id     [:node-stem-v id]
+                        :width  stem-stroke
+                        :height stem-height
+                        :child  black})
                {:id     [:node-stem-h id]
+                :x      (- min-x (/ stem-stroke 2))
                 :width  (+ width stem-stroke)
                 :height stem-stroke
-                :child  h-line}]))]
+                :child  black}]))]
          (flatten)
          (filter some?)
-         (paint-rect/center (paint-rect/center-x node))
          (paint-rect/space baseline))))
 
 (defn draw-tidy
