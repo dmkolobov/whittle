@@ -1,32 +1,73 @@
 (ns whittle.paint-rect
-  (:require [whittle-ide.graph :refer [topsort]]))
+  (:require [whittle-ide.graph :refer [topsort]]
 
-(defn translate
+            [cljsjs.react-transition-group]
+
+            ["react-transition-group/TransitionGroup" :as TransitionGroup]
+            ["react-transition-group/Transition" :as Transition]
+            ["react-transition-group/CSSTransition" :as CSSTransition]
+
+            [reagent.core :as reagent]
+            [clojure.string :as string]))
+
+(defn translate ;;
   [x y]
-  (str "translate("x"px, "y"px)"))
+  (str "translate3d("x"px, "y"px, 0)"))
 
 (defn transit
-  [prop duration ease delay]
-  (str prop" "duration"s "ease" "delay"s"))
+  [prop duration ease]
+  (str prop" "duration"s "ease))
 
-(defn paint-rect
-  [{:keys [x
-           y
-           width
-           height
+(defn move
+  [{:keys [id]}]
+  (reagent/create-class
+    {:reagent-render
+     (fn [{:keys [x y class transition child]}]
+       [:div.prect
+         {:class class
+          :style {:transform  (translate x y)
+                  :transition transition}}
+         child])}))
 
-           child]}]
-  (let [t "transform .2s ease-in"]
-    [:div
-     [:div.node
-      {:style {:position   "absolute"
-               :transform  (translate x y)
-               :transition t}}
-      child]
-      [:div.v-mask {:style {:transform  (translate (+ x width) y)
-                            :transition t}}]
-      [:div.h-mask {:style {:transform  (translate x (+ y height))
-                            :transition t}}]]))
+(def drop-transit (transit "transform" .10 "ease-in"))
+
+(defn do-paint
+  [{:keys [id
+               child
+               x
+               y
+               width height
+               duration ease timeout]
+        :or {duration 0.2
+             ease     "ease-in"}
+        :as node} state]
+      ;(cljs.pprint/pprint node)
+    [:div.prect
+     [move {:id id :class "node"   :x x           :y y :child child
+            :transition "none"}]
+     [move {:id id :class "v-mask" :x (+ x width) :y y
+            :transition "none"}]
+     [move {:id        id
+            :class     "h-mask"
+            :x          x
+            :y          (if (= state "entered")
+                          (+ y height)
+                          y)
+            :transition drop-transit}]])
+
+ (defn paint
+   [rects]
+   [:> TransitionGroup
+    {:component :div}
+    (doall
+      (for [{:keys [id timeout] :as node} rects]
+        ^{:key id}
+        [:> Transition
+         {:component :div
+          :timeout   timeout
+          :appear    true}
+          (fn [state]
+            (reagent/as-element [do-paint node state]))]))])
 
 
 (defn clips?

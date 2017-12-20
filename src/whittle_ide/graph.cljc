@@ -46,6 +46,7 @@
           (if (seq nodes)
             (recur (into sort-nodes nodes)
                    (remove-nodes graph nodes))
-            (throw (ex-info "cycle detected" {}))))
+            (throw (ex-info "cycle detected"
+                            {:graph graph}))))
         (into sort-nodes
               (set/difference (set (keys init-graph)) (set sort-nodes)))))))
