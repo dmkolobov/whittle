@@ -86,12 +86,12 @@
 
 
 (def stem-stroke 5)
-(def stem-height 7)
+(def stem-height 20)
 
 (def black-h [:div.black-h])
 (def black-v [:div.black-v])
 
-(def duration 500)
+(def duration 300)
 
 (defn node->rects
   [{:keys [id y width height children label level]
@@ -126,6 +126,7 @@
                         :width       (+ width stem-stroke)
                         :height      stem-stroke
                         :fix-height? true
+                        :cx-open     cx
                         :child       black-h}})))]))
 
 (defn choreograph-node
@@ -143,7 +144,7 @@
                              :timeout (+ start-time (* 0.5 duration))))
             (seq children) (conj (assoc stem
                                    :id [id :stem]
-                                   :timeout (- child-start (* 0.125 duration)))
+                                   :timeout (- child-start (* 0.25 duration)))
                            (assoc branch
                              :id [id :branch]
                              :timeout (- child-start (* 0.125 duration)))))))
