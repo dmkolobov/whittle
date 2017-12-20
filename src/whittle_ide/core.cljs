@@ -91,62 +91,86 @@
 (def black-h [:div.black-h])
 (def black-v [:div.black-v])
 
-(def duration 600)
+(def duration 500)
 
 (defn node->rects
-  [idx baseline {:keys [id y width height children label level]
-                 :or   {y 0}
-                 :as   node}]
-  (let [cx    (paint-rect/center-x node)
-        time  (* duration (+ idx level))]
-    (->> [(when (not= level 0)
-            (center cx
-                    {:id         [:node-root id]
-                     :width      stem-stroke
-                     :height     (+ stem-height y)
-                     :child      black-v
-                     :fix-width? true
-                     :timeout    time}))
-          (center cx
-                  {:id     [:node-body id]
-                   :width  width
-                   :height height
-                   :child  label
-                   :timeout (+ time (/ duration 4))})
+  [{:keys [id y width height children label level]
+     :or   {y 0}
+     :as   node}]
+  (let [cx    (paint-rect/center-x node)]
+    [node
+     (merge (when (not= level 0)
+             {:root (center cx
+                            {:width      stem-stroke
+                             :height     (+ stem-height y)
+                             :child      black-v
+                             :fix-width? true})})
+
+           {:node (center cx
+                          {:width  width
+                           :height height
+                           :child  label})}
+
           (when (seq children)
             (let [cxs   (map paint-rect/center-x children)
                   min-x (apply min cxs)
                   max-x (apply max cxs)
                   width (- max-x min-x)]
-              [(center cx
-                       {:id         [:node-stem-v id]
-                        :width      stem-stroke
-                        :fix-width? true
-                        :height     stem-height
-                        :child      black-v
-                        :timeout    (+ time (* 2 (/ duration 4)))})
-               {:id     [:node-stem-h id]
-                :x           (- min-x (/ stem-stroke 2))
-                :width       (+ width stem-stroke)
-                :height      stem-stroke
-                :fix-height? true
-                :timeout     (+ time (* 3 (/ duration 4)))
-                :child       black-h}]))]
-         (flatten)
-         (filter some?)
-         (paint-rect/space baseline))));;
+              {:stem   (center cx
+                               {:width      stem-stroke
+                                :fix-width? true
+                                :height     stem-height
+                                :child      black-v})
+
+               :branch {:x           (- min-x (/ stem-stroke 2))
+                        :width       (+ width stem-stroke)
+                        :height      stem-stroke
+                        :fix-height? true
+                        :child       black-h}})))]))
+
+(defn choreograph-node
+  [{:keys [id child-tick tick children]} {:keys [root node stem branch] :as parts}]
+  (let [start-time  (* duration tick)
+        child-start (when (some? child-tick)
+                      (* duration child-tick))]
+    (println "choreo" id)
+    (cond-> []
+            root     (conj (assoc root
+                             :id [id :root]
+                             :timeout (+ start-time (* 0.25 duration))))
+            node     (conj (assoc node
+                             :id [id :node]
+                             :timeout (+ start-time (* 0.5 duration))))
+            (seq children) (conj (assoc stem
+                                   :id [id :stem]
+                                   :timeout (- child-start (* 0.125 duration)))
+                           (assoc branch
+                             :id [id :branch]
+                             :timeout (- child-start (* 0.125 duration)))))))
+
+(defn tree->nodes
+  [tidy-tree]
+  (let [ticks (tidy/choreograph tidy-tree)]
+    (->> (tidy/node-seq tidy-tree)
+         (map (fn [{:keys [children] :as node}]
+                (assoc node
+                  :tick       (get ticks (:id node))
+                  :child-tick (when (seq children)
+                                (get ticks (:id (first children)))))))
+         (group-by :level))))
 
 (reg-event-db :reflow-tree
               (fn [{:keys [tidy-tree] :as db}]
                 (loop [baseline 0
-                       rows     (group-by :level (tidy/node-seq tidy-tree))
+                       rows     (tree->nodes tidy-tree)
                        rects    []]
                   (if (seq rows)
                     (let [[level nodes] (first rows)
                           row-rects (->> nodes
                                          (sort-by :x)
-                                         (map-indexed #(node->rects %1 baseline %2))
-                                         (apply concat)
+                                         (map node->rects)
+                                         (map (partial apply choreograph-node))
+                                         (mapcat (partial paint-rect/space baseline))
                                          (map #(assoc % :level level)))]
                       (recur (apply paint-rect/find-baseline row-rects)
                              (rest rows)

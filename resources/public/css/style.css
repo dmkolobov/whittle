@@ -127,7 +127,6 @@ line {
 
 .node, .h-mask, .v-mask, .black-h, .black-v, .prect {
     position:  absolute;
-    will-change: transform;
 }
 
 .v-mask, .h-mask {
@@ -151,3 +150,4 @@ line {
     width: 5px;
     height: 5000px;
 }
+

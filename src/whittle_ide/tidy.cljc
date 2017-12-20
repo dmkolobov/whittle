@@ -241,6 +241,34 @@
               #(assoc %1 :children %2)
               tidy))
 
+(defn add-ticks
+  "Given a location in the tree, the current tick, and a map of ticks, returns
+  a new map of ticks with an entry for each sibling of the location node, including
+  the location node itself."
+  [loc ticks current-tick]
+  (if loc
+    (recur (zip/right loc)
+           (assoc ticks (:id (zip/node loc)) current-tick)
+           current-tick)
+    ticks))
+
+(defn choreograph
+  "Given a tidy tree, return a map where keys are node ids and values
+  are node ticks."
+  [tidy]
+  (loop [loc          (node-seq-zipper tidy)
+         current-tick 0
+         ticks        {}]
+     (if (zip/end? loc)
+       ticks
+       (if (contains? ticks (:id (zip/node loc)))
+         (recur (zip/next loc)
+                current-tick
+                ticks)
+         (recur (zip/next loc)
+                (inc current-tick)
+                (add-ticks loc ticks current-tick))))))
+
 (defn node-seq
   [tidy]
   (loop [nodes []

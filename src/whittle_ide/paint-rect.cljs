@@ -43,8 +43,7 @@
              ease     "ease-in"}
         :as node} state]
     [:div.prect
-     [move {:id id :class "node"   :x x           :y y :child child
-            :transition "none"}]
+     [move {:id id :class "node" :x x :y y :child child :transition "none"}]
      (when-not fix-width?
        [move {:id id :class "v-mask" :x (+ x width) :y y
               :transition "none"}])
@@ -74,6 +73,7 @@
 
 (defn clips?
   [mask rect]
+  (println "clips?" (:y mask) (:y rect))
   (and (< (:x mask) (+ (:x rect) (:width rect)))
        (< (:y mask) (+ (:y rect) (:height rect)))))
 
@@ -103,10 +103,8 @@
 
 (defn center
   "Centers the given rects about x"
-  [x & rects]
-  (map (fn [{:keys [width] :as rect}]
-         (assoc rect :x (- x (/ width 2))))
-       rects))
+  [x {:keys [width] :as rect}]
+  (assoc rect :x (- x (/ width 2))))
 
 (defn find-baseline
   "Returns the minimum y bound of the given rects."
