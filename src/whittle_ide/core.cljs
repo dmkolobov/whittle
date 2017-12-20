@@ -46,9 +46,9 @@
   (into {}
         (map (fn [[index result]]
                [index
-                (cond (playback-node? result) [:pre [:code (print-code (:result result))]]
-                      (hiccup-tree? result)   [:pre.black [:code (name (first result))]]
-                      :default                [:pre [:code (print-code result)]])]))
+                (cond (playback-node? result) [:pre.prect [:code (print-code (:result result))]]
+                      (hiccup-tree? result)   [:pre.prect.black [:code (name (first result))]]
+                      :default                [:pre.prect [:code (print-code result)]])]))
         (index-tree result)))
 
 (defn all-measured?
@@ -85,10 +85,11 @@
                    :dispatch [:reflow-tree]})))
 
 
-(def stem-stroke 4)
+(def stem-stroke 5)
 (def stem-height 7)
 
-(def black [:div.black-canvas])
+(def black-h [:div.black-h])
+(def black-v [:div.black-v])
 
 (def duration 600)
 
@@ -100,11 +101,12 @@
         time  (* duration (+ idx level))]
     (->> [(when (not= level 0)
             (center cx
-                    {:id     [:node-root id]
-                     :width  stem-stroke
-                     :height (+ stem-height y)
-                     :child  black
-                     :timeout time}))
+                    {:id         [:node-root id]
+                     :width      stem-stroke
+                     :height     (+ stem-height y)
+                     :child      black-v
+                     :fix-width? true
+                     :timeout    time}))
           (center cx
                   {:id     [:node-body id]
                    :width  width
@@ -117,17 +119,19 @@
                   max-x (apply max cxs)
                   width (- max-x min-x)]
               [(center cx
-                       {:id     [:node-stem-v id]
-                        :width  stem-stroke
-                        :height stem-height
-                        :child  black
-                        :timeout (+ time (* 2 (/ duration 4)))})
+                       {:id         [:node-stem-v id]
+                        :width      stem-stroke
+                        :fix-width? true
+                        :height     stem-height
+                        :child      black-v
+                        :timeout    (+ time (* 2 (/ duration 4)))})
                {:id     [:node-stem-h id]
-                :x      (- min-x (/ stem-stroke 2))
-                :width  (+ width stem-stroke)
-                :height stem-stroke
-                :timeout (+ time (* 3 (/ duration 4)))
-                :child  black}]))]
+                :x           (- min-x (/ stem-stroke 2))
+                :width       (+ width stem-stroke)
+                :height      stem-stroke
+                :fix-height? true
+                :timeout     (+ time (* 3 (/ duration 4)))
+                :child       black-h}]))]
          (flatten)
          (filter some?)
          (paint-rect/space baseline))));;
@@ -138,13 +142,12 @@
                        rows     (group-by :level (tidy/node-seq tidy-tree))
                        rects    []]
                   (if (seq rows)
-                    (let [[_ nodes] (first rows)
+                    (let [[level nodes] (first rows)
                           row-rects (->> nodes
                                          (sort-by :x)
                                          (map-indexed #(node->rects %1 baseline %2))
-                                         (apply concat))]
-                          ;(mapcat #(node->rects baseline %)
-                           ;                 (sort-by :x nodes))]
+                                         (apply concat)
+                                         (map #(assoc % :level level)))]
                       (recur (apply paint-rect/find-baseline row-rects)
                              (rest rows)
                              (into rects row-rects)))

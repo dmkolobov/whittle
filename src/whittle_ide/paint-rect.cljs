@@ -37,23 +37,25 @@
                x
                y
                width height
+               fix-width? fix-height?
                duration ease timeout]
         :or {duration 0.2
              ease     "ease-in"}
         :as node} state]
-      ;(cljs.pprint/pprint node)
     [:div.prect
      [move {:id id :class "node"   :x x           :y y :child child
             :transition "none"}]
-     [move {:id id :class "v-mask" :x (+ x width) :y y
-            :transition "none"}]
-     [move {:id        id
-            :class     "h-mask"
-            :x          x
-            :y          (if (= state "entered")
-                          (+ y height)
-                          y)
-            :transition drop-transit}]])
+     (when-not fix-width?
+       [move {:id id :class "v-mask" :x (+ x width) :y y
+              :transition "none"}])
+     (when-not fix-height?
+       [move {:id        id
+              :class     "h-mask"
+              :x          x
+              :y          (if (= state "entered")
+                            (+ y height)
+                            y)
+              :transition drop-transit}])])
 
  (defn paint
    [rects]
@@ -82,9 +84,18 @@
         rect rects :when (not= mask rect)]
     (when (clips? mask rect) [rect mask])))
 
+;(defn paint-list
+;  [rects]
+;  (topsort (filter some? (paint-graph (set rects)))))
+
 (defn paint-list
   [rects]
-  (topsort (filter some? (paint-graph (set rects)))))
+  (->> (set rects)
+       (sort-by :level)
+       (partition-by :level)
+       (map paint-graph)
+       (map (partial filter some?))
+       (mapcat topsort)))
 
 (defn center-x
   [{:keys [x width]}]
