@@ -151,3 +151,11 @@ line {
     height: 5000px;
 }
 
+
+.v-mask {
+    background-color: #eee;
+}
+
+.h-mask {
+    background-color: #bbb;
+}

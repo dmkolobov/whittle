@@ -149,6 +149,15 @@
                              :id [id :branch]
                              :timeout (- child-start (* 0.125 duration)))))))
 
+(defn has-type? [type] (fn [{:keys [id]}] (= type (second id))))
+
+(defn ->paint-list
+  [row-rects]
+  (concat (filter (has-type? :root) row-rects)
+          (filter (has-type? :node) row-rects)
+          (filter (has-type? :stem) row-rects)
+          (filter (has-type? :branch) row-rects)))
+
 (defn tree->nodes
   [tidy-tree]
   (let [ticks (tidy/choreograph tidy-tree)]
@@ -175,9 +184,9 @@
                                          (map #(assoc % :level level)))]
                       (recur (apply paint-rect/find-baseline row-rects)
                              (rest rows)
-                             (into rects row-rects)))
+                             (into rects (->paint-list row-rects))))
                     (assoc db
-                      :paint-list (paint-rect/paint-list rects))))))
+                      :paint-list rects)))))
 
 (reg-sub :debug identity)
 (reg-sub :labels (fn [db] (get db :tree-labels)))

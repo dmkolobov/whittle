@@ -29,7 +29,8 @@
                   :transition transition}}
          child])}))
 
-(def drop-transit (transit "transform" .15 "ease-in"))
+(def drop-transit
+  (transit "transform" .15 "ease-in"));
 
 (defn do-paint
   [{:keys [id
@@ -95,7 +96,6 @@
 
 (defn clips?
   [mask rect]
-  (println "clips?" (:y mask) (:y rect))
   (and (< (:x mask) (+ (:x rect) (:width rect)))
        (< (:y mask) (+ (:y rect) (:height rect)))))
 
