@@ -30,7 +30,7 @@
          child])}))
 
 (def drop-transit
-  (transit "transform" .15 "ease-in"));
+  (transit "transform" .45 "ease-in"));
 
 (defn do-paint
   [{:keys [id

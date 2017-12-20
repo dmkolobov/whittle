@@ -91,7 +91,7 @@
 (def black-h [:div.black-h])
 (def black-v [:div.black-v])
 
-(def duration 300)
+(def duration 900)
 
 (defn node->rects
   [{:keys [id y width height children label level]
@@ -132,22 +132,28 @@
 (defn choreograph-node
   [{:keys [id child-tick tick children]} {:keys [root node stem branch] :as parts}]
   (let [start-time  (* duration tick)
-        child-start (when (some? child-tick)
-                      (* duration child-tick))]
+        [stem-time branch-time] (when (some? child-tick)
+                                  (let [child-start  (* duration child-tick)
+                                        l-stem       (:height stem)
+                                        l-branch     (:height branch)
+                                        stem-dur     (* 0.25 duration (/ 1 l-branch))
+                                        branch-dur   (* 0.25 duration (/ 1 l-stem))]
+                                    [(- child-start stem-dur branch-dur)
+                                     (- child-start branch-dur)]))]
     (println "choreo" id)
     (cond-> []
-            root     (conj (assoc root
-                             :id [id :root]
-                             :timeout (+ start-time (* 0.25 duration))))
-            node     (conj (assoc node
-                             :id [id :node]
-                             :timeout (+ start-time (* 0.5 duration))))
+            root            (conj (assoc root
+                                    :id [id :root]
+                                    :timeout (+ start-time (* 0.25 duration))))
+            node            (conj (assoc node
+                                    :id [id :node]
+                                    :timeout (+ start-time (* 0.5 duration))))
             (seq children) (conj (assoc stem
                                    :id [id :stem]
-                                   :timeout (- child-start (* 0.25 duration)))
-                           (assoc branch
-                             :id [id :branch]
-                             :timeout (- child-start (* 0.125 duration)))))))
+                                   :timeout stem-time)
+                                 (assoc branch
+                                   :id [id :branch]
+                                   :timeout branch-time)))))
 
 (defn has-type? [type] (fn [{:keys [id]}] (= type (second id))))
 
