@@ -7,8 +7,8 @@
             ["react-transition-group/CSSTransition" :as CSSTransition]))
 
 (defn translate
-  [x y]
-  (str "translate3d("x"px, "y"px, 0)"))
+  [x y z]
+  (str "translate3d("x"px, "y"px, "z"px)"))
 
 (defn transit
   ([prop duration ease]
@@ -33,10 +33,9 @@
   (let [default-transition (transit "transform" duration "ease-in-out" delay)
         transit-transition (transit "transform" duration "ease-in-out" transit-delay)
 
-        child-transform    (translate x y)
-        mask-transform     (translate x (+ y height))]
+        child-transform    (translate x y (/ z 1000))
+        mask-transform     (translate x (+ y height) (/ z 1000))]
     [:div
-     {:style {:z-index z}}
      [:div.rect-child
       {:style
        {

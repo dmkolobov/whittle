@@ -330,9 +330,9 @@
         y-atom (reagent/atom 100)
         rows   8
         cols   8
-        size   25
+        size   20
         delay  1000
-        duration 100
+        duration 250
         on-click #(swap! y-atom + size)]
     (fn []
       [:div
@@ -343,7 +343,7 @@
            (doall
              (for [[x y id] (grid rows cols size)]
                (let [y (+ y @y-atom)
-                     time (+ delay (* id duration 0.5))]
+                     time (+ delay (* id duration 0.125))]
                  ^{:key id}
                  [:> Transition
                   {:component :div
@@ -363,7 +363,7 @@
                           :z  id
 
                           :duration duration
-                          :delay    (* (- (* rows cols) id) 0.5 duration)
+                          :delay    (* (- (* rows cols) id) 0.125 duration)
                           :transit-delay time
 
                           :state    state
