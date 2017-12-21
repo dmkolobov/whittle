@@ -159,3 +159,14 @@ line {
 .h-mask {
     background-color: #fff;
 }
+
+.rect-child, .rect-mask {
+    position: absolute;
+    z-index: 500;
+}
+
+.rect-mask {
+    width: 25px;
+    height: 25px;
+    background-color: #fff;
+}

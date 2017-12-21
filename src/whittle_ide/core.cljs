@@ -21,6 +21,9 @@
             [whittle.lang.arithmetic :refer [lang clj-lang]]
             [whittle.inspect :refer [inspect playback index-tree tree-index playback-node? hiccup-tree?]]
             [whittle-ide.tidy :refer [tidy] :as tidy]
+
+            [whittle-ide.anim :as anim]
+
             [clojure.zip :as zip]
             [clojure.set :as set]
             [clojure.string :as string]))
@@ -313,8 +316,66 @@
                             :transition "opacity 1s ease-in"}}
                    (str x)]))]))]])))
 
+(defn grid
+  [rows cols size]
+  (map conj
+       (for [y (take-nth 2 (range 0 (* rows size 2) size))
+             x (take-nth 2 (range 0 (* cols size 2) size))]
+         [x y])
+       (range (* rows cols))))
 
-(reagent/render-component [hello-world]
+(defn drop-test
+  []
+  (let [show?  (reagent/atom false)
+        y-atom (reagent/atom 100)
+        rows   8
+        cols   8
+        size   25
+        delay  1000
+        duration 100
+        on-click #(swap! y-atom + size)]
+    (fn []
+      [:div
+       [:a {:href "#" :on-click #(swap! show? not)} "Toggle"]
+        [:> TransitionGroup
+         {:component :div}
+         (if @show?
+           (doall
+             (for [[x y id] (grid rows cols size)]
+               (let [y (+ y @y-atom)
+                     time (+ delay (* id duration 0.5))]
+                 ^{:key id}
+                 [:> Transition
+                  {:component :div
+                   :timeout   {"enter" (+ time duration)
+                               "exit"  (+ time duration)}
+                   :on-enter #(.-scrollTop %)
+                   :appear    true
+                   }
+                   (fn [state]
+                     (reagent/as-element
+                       [anim/drops
+                         {:x        x
+                          :y        y
+                          :height   size
+                          :width    size
+
+                          :z  id
+
+                          :duration duration
+                          :delay    (* (- (* rows cols) id) 0.5 duration)
+                          :transit-delay time
+
+                          :state    state
+
+                          :child [:div {:style {:display "inline-block"
+                                                :width  size
+                                                :height size
+                                                :background-color "red"}
+                                        :on-click on-click}]}]))])))
+           (list))]])))
+
+(reagent/render-component [drop-test]
                           (. js/document (getElementById "app")))
 
 (defn on-js-reload []
