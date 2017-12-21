@@ -140,7 +140,6 @@
                                         branch-dur   (* 0.25 duration (/ 1 l-stem))]
                                     [(- child-start stem-dur branch-dur)
                                      (- child-start branch-dur)]))]
-    (println "choreo" id)
     (cond-> []
             root            (conj (assoc root
                                     :id [id :root]
@@ -185,9 +184,12 @@
                           row-rects (->> nodes
                                          (sort-by :x)
                                          (map node->rects)
-                                         (map (partial apply choreograph-node))
-                                         (mapcat (partial paint-rect/space baseline))
-                                         (map #(assoc % :level level)))]
+                                         (map (fn [[node parts]]
+                                                [node
+                                                 (zipmap (keys parts)
+                                                         (paint-rect/space baseline
+                                                                           (vals parts)))]))
+                                         (mapcat (partial apply choreograph-node)))]
                       (recur (apply paint-rect/find-baseline row-rects)
                              (rest rows)
                              (into rects (->paint-list row-rects))))
