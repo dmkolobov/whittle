@@ -17,6 +17,21 @@
   ([prop duration ease delay]
    (str (transit prop duration ease) " " (/ delay 1000) "s")))
 
+(defn run-transitions
+  [animations]
+  [:> TransitionGroup
+   {:component :div}
+   (for [[anim {:keys [z transit-delay duration] :as opts}] animations]
+     ^{:key z}
+     [:> Transition
+      {:component :div
+       :timeout   {"enter" (+ transit-delay duration)
+                   "exit"  (+ transit-delay duration)}
+       :on-enter  #(.-scrollTop %)
+       :appear    true}
+       (fn [state]
+         (reagent/as-element [anim (assoc opts :state state)]))])])
+
 (defn drops
 [{:keys [in
            child
@@ -58,4 +73,3 @@
 
                 "exited"   {:transform  child-transform
                             :transition "none"})}]]))
-

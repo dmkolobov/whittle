@@ -324,6 +324,14 @@
          [x y])
        (range (* rows cols))))
 
+(defn grid-block
+  [size on-click]
+  [:div {:style {:display "inline-block"
+                 :width  size
+                 :height size
+                 :background-color "red"}
+         :on-click on-click}])
+
 (defn drop-test
   []
   (let [show?  (reagent/atom false)
@@ -337,26 +345,13 @@
     (fn []
       [:div
        [:a {:href "#" :on-click #(swap! show? not)} "Toggle"]
-        [:> TransitionGroup
-         {:component :div}
-         (if @show?
-           (doall
-             (for [[x y id] (grid rows cols size)]
-               (let [y (+ y @y-atom)
-                     time (+ delay (* id duration 0.125))]
-                 ^{:key id}
-                 [:> Transition
-                  {:component :div
-                   :timeout   {"enter" (+ time duration)
-                               "exit"  (+ time duration)}
-                   :on-enter #(.-scrollTop %)
-                   :appear    true
-                   }
-                   (fn [state]
-                     (reagent/as-element
-                       [anim/drops
+        [anim/run-transitions
+         (doall
+           (for [[x y id] (if @show? (grid rows cols size) (list))]
+           ^{:key id}
+           [anim/drops
                          {:x        x
-                          :y        y
+                          :y        (+ y @y-atom)
                           :height   size
                           :width    size
 
@@ -364,16 +359,9 @@
 
                           :duration duration
                           :delay    (* (- (* rows cols) id) 0.125 duration)
-                          :transit-delay time
+                          :transit-delay (* 0.125 duration id)
 
-                          :state    state
-
-                          :child [:div {:style {:display "inline-block"
-                                                :width  size
-                                                :height size
-                                                :background-color "red"}
-                                        :on-click on-click}]}]))])))
-           (list))]])))
+                          :child [grid-block size on-click]}]))]])))
 
 (reagent/render-component [drop-test]
                           (. js/document (getElementById "app")))
