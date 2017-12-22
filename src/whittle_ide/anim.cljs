@@ -32,6 +32,46 @@
        (fn [state]
          (reagent/as-element [anim (assoc opts :state state)]))])])
 
+(defn snake
+  [{:keys [x]}]
+  (let [state (atom {:x    x
+                     :el   "none"
+                     :mask "none"})]
+    (reagent/create-class
+     {:component-will-receive-props
+      (fn [this]
+        (let [{:keys [x duration delay]} (reagent/props this)]
+          (swap! state
+               (fn [old-state]
+                 (cond (< x (:x old-state))
+                       {:x    x
+                        :el   (transit "transform" (/ duration 2) "ease-in-out" delay)
+                        :mask (transit "transform" (/ duration 2) "ease-in-out" (+ delay (/ duration 2)))}
+
+                       (> x (:x old-state))
+                       {:x    x
+                        :el   (transit "transform" (/ duration 2) "ease-in-out" (+ delay (/ duration 2)))
+                        :mask (transit "transform" (/ duration 2) "ease-in-out" delay)}
+
+                       :default (do (println "same") old-state))))))
+      :reagent-render
+      (fn [{:keys [style
+                   x
+                   y
+                   width
+                   height]}]
+        [:div
+         [:div.rect-child
+          {:style (merge style
+                        {:height     height
+                         :transform  (translate x y 0)
+                         :width      2000
+                         :transition (get @state :el)})}]
+         [:div.rect-mask
+          {:style {:transform  (translate (+ x width) y 0)
+                   :width      2000
+                   :transition (get @state :mask)}}]])})))
+
 (defn drops
 [{:keys [in
            child

@@ -363,7 +363,27 @@
 
                           :child [grid-block size on-click]}]))]])))
 
-(reagent/render-component [drop-test]
+(defn snake-test
+  []
+  (let [x-at (atom 20)
+        size 20
+        step 40
+        move-right #(swap! x-at + step)
+        move-left  #(swap! x-at - step)]
+    (fn []
+      [:div
+       [:a {:href "#" :on-click move-left} "<"]
+       [:a {:href "#" :on-click move-right} ">"]
+       [anim/snake {:style    {:background-color "red"
+                               :display "inline-block"}
+                    :x        @x-at
+                    :y        50
+                    :width    size
+                    :height   size
+                    :delay    0
+                    :duration 300}]])))
+
+(reagent/render-component [snake-test]
                           (. js/document (getElementById "app")))
 
 (defn on-js-reload []
