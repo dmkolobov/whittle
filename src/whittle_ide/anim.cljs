@@ -99,9 +99,49 @@
               :transform  tx}}
      (compose-child child state)]))
 
+(defn mask
+  [{:keys [width height state transition initial-transform final-transform]}]
+  [:div.rect-mask
+   {:style (merge {:width width :height height}
+                  (condp = state
+                    "entering" {:transform final-transform    :transition transition}
+                    "entered"  {:transform final-transform    :transition "none"}
+                    "exiting"  {:transform initial-transform  :transition transition}
+                    "exited"   {:transform initial-transform  :transition "none"}))}])
+;;
+(defn opens-horiz
+  [{:keys [child
+           state
+           width
+           height
+
+           z
+
+           duration
+           ease
+           delay]}]
+  (let [transition (transit "transform" duration ease delay)
+        mask-width (/ width 2)]
+    [:div
+     child
+     [mask {:state             state
+            :width             mask-width
+            :height            height
+            :transition        transition
+            :initial-transform (translate 0 0 (+ z .000001))
+            :final-transform   (translate (- mask-width) 0 (+ z .000001))}]
+
+     [mask {:state             state
+            :width             mask-width
+            :height            height
+            :transition        transition
+            :initial-transform (translate mask-width 0 (+ z .000002))
+            :final-transform   (translate width 0 (+ z .000002))}]]))
+
 (defn opens-down
   [{:keys [child
            state
+           width
            height
 
            z
@@ -112,14 +152,10 @@
     :or {ease  "ease-in-out"
          delay 0
          z     0}}]
-  (let [transition (transit "transform" duration ease delay)
-        tx         (translate 0 0 z)
-        tx'        (translate 0 height z)]
-    [:div
-     child
-     [:div.rect-mask
-      {:style (condp = state
-                "entering" {:transform tx' :transition transition}
-                "entered"  {:transform tx' :transition "none"}
-                "exiting"  {:transform tx  :transition transition}
-                "exited"   {:transform tx  :transition "none"})}]]))
+    [:div child
+     [mask {:state             state
+            :width             width
+            :height            height
+            :transition        (transit "transform" duration ease delay)
+            :initial-transform (translate 0 0 z)
+            :final-transform   (translate 0 height z)}]])

@@ -343,8 +343,9 @@
         delay  1000
         duration 250
         on-click #(swap! y-atom + size)
+        simul      8
         timeout  (fn [{:keys [id]}]
-                   (+ delay (* 0.125 duration id) duration))]
+                   (+ delay (* (/ 1 simul) duration id) duration))]
     (fn []
       [:div
        [:a {:href "#" :on-click #(swap! show? not)} "Toggle"]
@@ -352,7 +353,6 @@
         (doall
           (for [[x y id] (if @show? (grid rows cols size) (list))]
             (let [z-offset   (/ id 1000)
-                  simul      16
                   open-delay (+ delay (* (/ 1 simul) duration id))
                   move-delay (* (/ 1 simul) duration (- (* rows cols) id))]
               [anim/moves
@@ -360,11 +360,13 @@
                 :z        z-offset
                 :x        x
                 :y        (+ y @y-atom)
-                :child    [anim/opens-down {:height   size
-                                            :z        (+ z-offset 0.00001)
-                                            :duration duration
-                                            :delay    open-delay
-                                            :child    [grid-block size on-click]}]
+                :child    [(if (even? id) anim/opens-horiz anim/opens-down)
+                           {:width    size
+                            :height   size
+                            :z        (+ z-offset 0.00001)
+                            :duration duration
+                            :delay    open-delay
+                            :child    [grid-block size on-click]}]
                 :duration duration
                 :delay    move-delay}])))]])))
 
