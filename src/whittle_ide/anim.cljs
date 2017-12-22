@@ -18,15 +18,15 @@
    (str (transit prop duration ease) " " (/ delay 1000) "s")))
 
 (defn run-transitions
-  [animations]
+  [{:keys [timeout-fn]} animations]
   [:> TransitionGroup
    {:component :div}
-   (for [[anim {:keys [z transit-delay duration] :as opts}] animations]
-     ^{:key z}
+   (for [[anim {:keys [id] :as opts}] animations]
+     ^{:key [id]}
      [:> Transition
       {:component :div
-       :timeout   {"enter" (+ transit-delay duration)
-                   "exit"  (+ transit-delay duration)}
+       :timeout   {"enter" (timeout-fn opts)
+                   "exit"  (timeout-fn opts)}
        :on-enter  #(.-scrollTop %)
        :appear    true}
        (fn [state]
@@ -72,44 +72,54 @@
                    :width      2000
                    :transition (get @state :mask)}}]])})))
 
-(defn drops
-[{:keys [in
-           child
+(defn compose-child
+  [child state]
+  (if (and (vector? child)
+           (map? (second child)))
+    (update child 1 assoc :state state)
+    child))
+
+(defn moves
+  [{:keys [child
            state
            x
            y
            z
-           height
+
            duration
            ease
-           delay
-           transit-delay]
-    :as opts}]
-  (let [default-transition (transit "transform" duration "ease-in-out" delay)
-        transit-transition (transit "transform" duration "ease-in-out" transit-delay)
+           delay]
+    :or {ease  "ease-in-out"
+         delay 0
+         z     0}}]
+  (let [tx         (translate x y z)
+        transition (transit "transform" duration ease delay)]
+    [:div.rect-child
+     {:style {:transition transition
+              :transform  tx}}
+     (compose-child child state)]))
 
-        child-transform    (translate x y (/ z 1000))
-        mask-transform     (translate x (+ y height) (/ z 1000))]
+(defn opens-down
+  [{:keys [child
+           state
+           height
+
+           z
+
+           duration
+           ease
+           delay]
+    :or {ease  "ease-in-out"
+         delay 0
+         z     0}}]
+  (let [transition (transit "transform" duration ease delay)
+        tx         (translate 0 0 z)
+        tx'        (translate 0 height z)]
     [:div
-     [:div.rect-child
-      {:style
-       {
-        :transform  child-transform
-        :transition (if (= state "entering")
-                      "none"
-                      default-transition)}}
-      child]
+     child
      [:div.rect-mask
-      {:class state
-       :style (condp = state
-                "entering" {:transform  mask-transform
-                            :transition transit-transition}
-
-                "entered"  {:transform  mask-transform
-                            :transition default-transition}
-
-                "exiting"  {:transform  child-transform
-                            :transition transit-transition}
-
-                "exited"   {:transform  child-transform
-                            :transition "none"})}]]))
+      {:style (condp = state
+                "entering" {:transform tx' :transition transition}
+                "entered"  {:transform tx' :transition "none"}
+                "exiting"  {:transform tx  :transition transition}
+                "exited"   {:transform tx  :transition "none"})}]]))

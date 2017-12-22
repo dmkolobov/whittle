@@ -327,41 +327,49 @@
 (defn grid-block
   [size on-click]
   [:div {:style {:display "inline-block"
+                 :position "absolute"
                  :width  size
                  :height size
                  :background-color "red"}
          :on-click on-click}])
 
-(defn drop-test
+(defn drop-test-1
   []
   (let [show?  (reagent/atom false)
         y-atom (reagent/atom 100)
-        rows   8
-        cols   8
+        rows   16
+        cols   16
         size   20
         delay  1000
         duration 250
-        on-click #(swap! y-atom + size)]
+        on-click #(swap! y-atom + size)
+        timeout  (fn [{:keys [id]}]
+                   (+ delay (* 0.125 duration id) duration))]
     (fn []
       [:div
        [:a {:href "#" :on-click #(swap! show? not)} "Toggle"]
-        [anim/run-transitions
-         (doall
-           (for [[x y id] (if @show? (grid rows cols size) (list))]
-           ^{:key id}
-           [anim/drops
-                         {:x        x
-                          :y        (+ y @y-atom)
-                          :height   size
-                          :width    size
+       [anim/run-transitions {:timeout-fn timeout}
+        (doall
+          (for [[x y id] (if @show? (grid rows cols size) (list))]
+            (let [z-offset   (/ id 1000)
+                  simul      16
+                  open-delay (+ delay (* (/ 1 simul) duration id))
+                  move-delay (* (/ 1 simul) duration (- (* rows cols) id))]
+              [anim/moves
+               {:id       id
+                :z        z-offset
+                :x        x
+                :y        (+ y @y-atom)
+                :child    [anim/opens-down {:height   size
+                                            :z        (+ z-offset 0.00001)
+                                            :duration duration
+                                            :delay    open-delay
+                                            :child    [grid-block size on-click]}]
+                :duration duration
+                :delay    move-delay}])))]])))
 
-                          :z  id
 
-                          :duration duration
-                          :delay    (* (- (* rows cols) id) 0.125 duration)
-                          :transit-delay (* 0.125 duration id)
 
-                          :child [grid-block size on-click]}]))]])))
 
 (defn snake-test
   []
@@ -383,7 +391,7 @@
                     :delay    0
                     :duration 300}]])))
 
-(reagent/render-component [snake-test]
+(reagent/render-component [drop-test-1]
                           (. js/document (getElementById "app")))
 
 (defn on-js-reload []
