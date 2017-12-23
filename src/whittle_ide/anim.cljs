@@ -115,28 +115,31 @@
            width
            height
 
+           offset
+
            z
 
            duration
            ease
-           delay]}]
-  (let [transition (transit "transform" duration ease delay)
-        mask-width (/ width 2)]
+           delay]
+    :or {offset (/ width 2)}}]
+  (let [transition (transit "transform" duration ease delay)]
     [:div
+     {:style {:position "absolute" :overflow "hidden" :width width :height height}}
      child
      [mask {:state             state
-            :width             mask-width
+            :width             width
             :height            height
             :transition        transition
-            :initial-transform (translate 0 0 (+ z .000001))
-            :final-transform   (translate (- mask-width) 0 (+ z .000001))}]
+            :initial-transform (translate (- offset width) 0 (+ z .000001))
+            :final-transform   (translate (- width) 0 (+ z .000001))}]
 
-     [mask {:state             state
-            :width             mask-width
-            :height            height
-            :transition        transition
-            :initial-transform (translate mask-width 0 (+ z .000002))
-            :final-transform   (translate width 0 (+ z .000002))}]]))
+      [mask {:state             state
+             :width             width
+             :height            height
+             :transition        transition
+             :initial-transform (translate offset 0 (+ z .000002))
+             :final-transform   (translate width 0 (+ z .000002))}]]))
 
 (defn opens-down
   [{:keys [child
