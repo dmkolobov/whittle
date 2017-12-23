@@ -287,28 +287,33 @@
       (replace-nodes)
       (position-nodes)))
 
+(defn plot-branch
+  [{:keys [edge-stroke edge-height]} {:keys [children] :as node}]
+  (let [cx    (rect/center-x node)
+        cxs   (map rect/center-x children)
+        min-x (apply min cxs)
+        max-x (apply max cxs)
+        width (- max-x min-x)
+        left  (- min-x (/ edge-stroke 2))]
+    {:stem   (rect/center cx {:width edge-stroke :height edge-height})
+     :branch {:x      left
+              :width  (+ width edge-stroke)
+              :offset (- cx left)
+              :height edge-stroke}}))
+
 (defn plot-node
   "Given a tidy-tree node, return a parts map."
-  [{:keys [edge-stroke edge-height]} {:keys [level children width height y] :as node} ]
+  [{:keys [edge-stroke edge-height] :as opts}
+   {:keys [level children width height y] :as node}]
   (let [cx (rect/center-x node)]
     (merge (when (not= level 0)
-             {:root (rect/center cx
-                                 {:width  edge-stroke
-                                  :height (+ edge-height y)})})
+             {:root (rect/center cx {:width edge-stroke :height (+ edge-height y)})})
            {:body (rect/center cx {:width width :height height})}
            (when (seq children)
              (if (= 1 (count children))
-               {:stem (rect/center cx {:width edge-stroke :height (+ edge-height edge-stroke)})}
-               (let [cxs   (map rect/center-x children)
-                     min-x (apply min cxs)
-                     max-x (apply max cxs)
-                     width (- max-x min-x)
-                     left  (- min-x (/ edge-stroke 2))]
-                 {:stem   (rect/center cx {:width edge-stroke :height edge-height})
-                  :branch {:x      left
-                           :width  (+ width edge-stroke)
-                           :offset (- cx left)
-                           :height edge-stroke}}))))))
+               {:stem (rect/center cx {:width  edge-stroke
+                                       :height (+ edge-height edge-stroke)})}
+               (plot-branch opts node))))))
 
 (defn plot
   "Given a tidy-tree, return a sequence of vectors [node parts], where parts
