@@ -167,3 +167,8 @@ line {
 .rect-mask {
     background-color: #fff;
 }
+
+.edge {
+    position: absolute;
+    background: #000;
+}

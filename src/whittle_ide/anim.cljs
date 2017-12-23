@@ -108,7 +108,7 @@
                     "entered"  {:transform final-transform    :transition "none"}
                     "exiting"  {:transform initial-transform  :transition transition}
                     "exited"   {:transform initial-transform  :transition "none"}))}])
-;;
+
 (defn opens-horiz
   [{:keys [child
            state
@@ -155,7 +155,9 @@
     :or {ease  "ease-in-out"
          delay 0
          z     0}}]
-    [:div child
+    [:div
+     {:style {:position "absolute" :overflow "hidden" :width width :height height}}
+     child
      [mask {:state             state
             :width             width
             :height            height

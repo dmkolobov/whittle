@@ -1,5 +1,6 @@
 (ns whittle-ide.tidy
   (:require [whittle.inspect :refer [hiccup-tree? tree-index]]
+            [whittle-ide.rect :as rect]
             [clojure.zip :as zip]
             [clojure.set :as set]))
 
@@ -285,3 +286,57 @@
       (replace-trees args)
       (replace-nodes)
       (position-nodes)))
+
+(defn plot-node
+  "Given a tidy-tree node, return a parts map."
+  [{:keys [edge-stroke edge-height]} {:keys [level children width height y] :as node} ]
+  (let [cx (rect/center-x node)]
+    (merge (when (not= level 0)
+             {:root (rect/center cx
+                                 {:width  edge-stroke
+                                  :height (+ edge-height y)})})
+           {:body (rect/center cx {:width width :height height})}
+           (when (seq children)
+             (let [cxs   (map rect/center-x children)
+                   min-x (apply min cxs)
+                   max-x (apply max cxs)
+                   width (- max-x min-x)
+                   left  (- min-x (/ edge-stroke 2))]
+               {:stem   (rect/center cx {:width edge-stroke :height edge-height})
+                :branch {:x      left
+                         :width  (+ width edge-stroke)
+                         :offset (- cx left)
+                         :height edge-stroke}})))))
+
+(defn plot
+  "Given a tidy-tree, return a sequence of vectors [node parts], where parts
+  is a map containing the following keys:
+
+  :root   - the edge drawn from the parent node branch to the current node
+  :body   - the node label itself
+  :stem   - the portion of the edge drawn from this node to where the edge branches
+  :branch - the horizontal portion of the child edge.
+
+  Each part has an :x, :y, :width, and :height."
+  [tidy-tree & opts]
+  (loop [baseline 0
+         rows     (->> tidy-tree
+                       (node-seq)
+                       (group-by :level)
+                       (sort-by first)
+                       (map second))
+         result   []]
+    (println baseline)
+    (if (seq rows)
+      (let [nodes        (first rows)
+            parts        (map (partial plot-node opts) nodes)
+            spaced-rects (map (partial rect/space baseline) (map vals parts))]
+        (recur (rect/find-baseline (apply concat spaced-rects))
+               (rest rows)
+               (into result
+                     (map (fn [node part-keys part-rects]
+                            [node (zipmap part-keys part-rects)])
+                          nodes
+                          (map keys parts)
+                          spaced-rects))))
+      result)))

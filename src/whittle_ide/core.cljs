@@ -85,7 +85,7 @@
                                           :measurements tree-measures)
                          :tree-labels {}
                          :measurements {})
-                   :dispatch [:reflow-tree]})))
+                   :dispatch [:prepare-drawing]})))
 
 
 (def stem-stroke 5)
@@ -205,6 +205,111 @@
 (reg-sub :paint-list (fn [db] (get db :paint-list)))
 
 
+(reg-sub :drawing (fn [db] (get db :drawing)))
+
+(reg-event-db :prepare-drawing
+              (fn [{:keys [tidy-tree] :as db}]
+                (assoc db
+                  :drawing {:ticks (tidy/choreograph tidy-tree)
+                            :rects (tidy/plot tidy-tree
+                                              :edge-stroke 5
+                                              :edge-height 20)})))
+
+(defn draw-rect
+  [child {:keys [x y width height]}]
+  (println y)
+  [:div {:style {:transform (anim/translate x y 0)
+                 :position  "absolute"
+                 :width     width
+                 :height    height}}
+   child])
+
+(defn draw-edge
+  [{:keys [width height]}]
+  [:div.edge {:style {:width     width
+                      :height    height}}])
+
+(defn choreograph-parts
+  [ticks {:keys [id children]} {:keys [stem branch]}]
+  (let [tick (get ticks id)]
+    (merge {:root {:delay    tick
+                   :duration 0.25}
+            :body {:delay    (+ tick 0.25)
+                   :duration 0.5}}
+           (when (seq children)
+             (let [{:keys [id]} (first children)
+                   child-tick   (get ticks id)
+                   slen         (:height stem)
+                   blen         (:width branch)
+                   tlen         (+ slen blen) ;;
+                   stemdur      (* 0.25 (/ slen tlen))
+                   branchdur    (* 0.25 (/ blen tlen))]
+               {:stem   {:delay    (- child-tick stemdur branchdur)
+                         :duration stemdur}
+                :branch {:delay    (- child-tick branchdur)
+                         :duration branchdur}})))))
+
+(defn draw-node
+  [ticks [{:keys [id label] :as node} {:keys [root body stem branch] :as parts}]]
+  (let [choreo (choreograph-parts ticks node parts)]
+    (println choreo)
+    [(when root  ^{:key [id :root]} [draw-rect [draw-edge root] root])
+     ^{:key [id :body]} [draw-rect label body]
+     (when stem ^{:key [id :stem]} [draw-rect [draw-edge stem] stem])
+     (when branch ^{:key [id :branch]} [draw-rect [draw-edge branch] branch])]))
+
+(def tick-len 300)
+
+(defn wrap-part
+  [id choreo transition part-id part child]
+  (let [duration (* tick-len (get-in choreo [part-id :duration]))
+        delay    (* tick-len (get-in choreo [part-id :delay]))]
+    [anim/moves (assoc part
+                  :id      [id part-id]
+                  :timeout (+ delay duration)
+                  :child   [transition (assoc part
+                                         :child    child
+                                         :duration duration
+                                         :delay    delay)])]))
+
+(defn animate-node
+  [ticks [{:keys [id label] :as node} {:keys [root body stem branch] :as parts}]]
+  (let [choreo (choreograph-parts ticks node parts)]
+    [(when root
+       (wrap-part id choreo anim/opens-down :root root [draw-edge root]))
+     (wrap-part id choreo anim/opens-down :body body label)
+     (when stem
+       (wrap-part id choreo anim/opens-down :stem stem [draw-edge stem]))
+     (when branch
+       (wrap-part id choreo anim/opens-horiz :branch branch [draw-edge branch]))]))
+
+(defn animate
+  []
+  (let [drawing (subscribe [:drawing])]
+    (fn []
+      [anim/run-transitions {:timeout-fn :timeout}
+       (when-let [d @drawing]
+         (let [{:keys [ticks rects]} d]
+           (doall
+             (->> rects
+                  (mapcat (partial animate-node ticks))
+                  (filter some?)))))])))
+
+
+(defn draw
+  []
+  (let [drawing (subscribe [:drawing])]
+    (fn []
+      [:div
+       (when-let [d @drawing]
+         (let [{:keys [ticks rects]} d]
+           (doall
+             (->> rects
+                  (mapcat (partial draw-node ticks))
+                  (filter some?)))))])))
+
+
+
 (defn draw-tidy
   []
   (let [paint-list (subscribe [:paint-list])]
@@ -241,7 +346,7 @@
        [:div.tidy-tree
           {:style {:position "absolute"
                    :transform "translateX(400px)"}}
-          [draw-tidy]]])))
+          [animate]]])))
 
 (reg-sub :state
          (fn [{:keys [state states] :as db}]
@@ -393,7 +498,7 @@
                     :delay    0
                     :duration 300}]])))
 
-(reagent/render-component [drop-test-1]
+(reagent/render-component [hello-world]
                           (. js/document (getElementById "app")))
 
 (defn on-js-reload []
