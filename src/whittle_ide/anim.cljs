@@ -45,13 +45,13 @@
                (fn [old-state]
                  (cond (< x (:x old-state))
                        {:x    x
-                        :el   (transit "transform" (/ duration 2) "ease-in-out" delay)
-                        :mask (transit "transform" (/ duration 2) "ease-in-out" (+ delay (/ duration 2)))}
+                        :el   (transit "transform" (/ duration 2) "linear" delay)
+                        :mask (transit "transform" (/ duration 2) "linear" (+ delay (/ duration 2)))}
 
                        (> x (:x old-state))
                        {:x    x
-                        :el   (transit "transform" (/ duration 2) "ease-in-out" (+ delay (/ duration 2)))
-                        :mask (transit "transform" (/ duration 2) "ease-in-out" delay)}
+                        :el   (transit "transform" (/ duration 2) "linear" (+ delay (/ duration 2)))
+                        :mask (transit "transform" (/ duration 2) "linear" delay)}
 
                        :default (do (println "same") old-state))))))
       :reagent-render
@@ -89,7 +89,7 @@
            duration
            ease
            delay]
-    :or {ease  "ease-in-out"
+    :or {ease  "linear"
          delay 0
          z     0}}]
   (let [tx         (translate x y z)
@@ -122,7 +122,8 @@
            duration
            ease
            delay]
-    :or {offset (/ width 2)}}]
+    :or {offset (/ width 2)
+         ease   "linear"}}]
   (let [transition (transit "transform" duration ease delay)]
     [:div
      {:style {:position "absolute" :overflow "hidden" :width width :height height}}
@@ -152,7 +153,7 @@
            duration
            ease
            delay]
-    :or {ease  "ease-in-out"
+    :or {ease  "linear"
          delay 0
          z     0}}]
     [:div

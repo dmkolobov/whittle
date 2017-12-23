@@ -297,16 +297,18 @@
                                   :height (+ edge-height y)})})
            {:body (rect/center cx {:width width :height height})}
            (when (seq children)
-             (let [cxs   (map rect/center-x children)
-                   min-x (apply min cxs)
-                   max-x (apply max cxs)
-                   width (- max-x min-x)
-                   left  (- min-x (/ edge-stroke 2))]
-               {:stem   (rect/center cx {:width edge-stroke :height edge-height})
-                :branch {:x      left
-                         :width  (+ width edge-stroke)
-                         :offset (- cx left)
-                         :height edge-stroke}})))))
+             (if (= 1 (count children))
+               {:stem (rect/center cx {:width edge-stroke :height (+ edge-height edge-stroke)})}
+               (let [cxs   (map rect/center-x children)
+                     min-x (apply min cxs)
+                     max-x (apply max cxs)
+                     width (- max-x min-x)
+                     left  (- min-x (/ edge-stroke 2))]
+                 {:stem   (rect/center cx {:width edge-stroke :height edge-height})
+                  :branch {:x      left
+                           :width  (+ width edge-stroke)
+                           :offset (- cx left)
+                           :height edge-stroke}}))))))
 
 (defn plot
   "Given a tidy-tree, return a sequence of vectors [node parts], where parts
