@@ -164,4 +164,4 @@
             :height            height
             :transition        (transit "transform" duration ease delay)
             :initial-transform (translate 0 0 z)
-            :final-transform   (translate 0 height z)}]])
+            :final-transform   (translate 0 height z)}]]);;
