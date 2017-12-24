@@ -213,7 +213,7 @@
                   :drawing {:ticks (tidy/choreograph tidy-tree)
                             :rects (tidy/plot tidy-tree
                                               :edge-stroke 5
-                                              :edge-height 20)})))
+                                              :edge-height 10)})))
 
 (defn draw-rect
   [child {:keys [x y width height]}]
@@ -368,10 +368,12 @@
                   {:db       (assoc db :state idx)
                    :dispatch [:make-tidy tree (label-tree tree)]})))
 
-(reg-event-db :register-states (fn [db [_ states]]
-                                 (assoc db
-                                   :state  0
-                                   :states (vec states))))
+(reg-event-fx :register-states
+              (fn [{:keys [db]} [_ states]]
+                {:db (assoc db
+                       :state  0
+                       :states (vec states))
+                 :dispatch [:make-tidy (first states) (label-tree (first states))]}))
 
 (reg-sub :state-idx (fn [db] (get db :state)))
 
@@ -386,15 +388,16 @@
                                 (playback (inspect clj-lang program-1))])
     (fn []
       [:div
-       [:pre [:code exp-1]]
         (if-let [state @state]
           [:div
-           [:a {:href "#"
+           [:div {:style {:float "right"}}
+            [:a {:href "#"
                 :on-click #(do (.preventDefault %) (dispatch [:rewind-state]))}
             "prev"]
            [:a {:href "#"
                 :on-click #(do (.preventDefault %) (dispatch [:advance-state]))}
-            "next"]
+            "next"]]
+           [:pre [:code program-1]]
            [:div [draw-tree @state-idx state]]]
           [:div "..."])])))
 

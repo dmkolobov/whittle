@@ -114,7 +114,7 @@
       max-overlap
       0)))
 
-(def gap 20)
+(def gap 10)
 
 (defn spread-trees
   [children]
