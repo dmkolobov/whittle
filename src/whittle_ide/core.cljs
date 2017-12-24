@@ -235,7 +235,7 @@
     (merge {:root {:delay    tick
                    :duration 0.25}
             :body {:delay    (+ tick 0.25)
-                   :duration 0.25}}
+                   :duration 0.5}}
            (when (seq children)
              (let [[{:keys [id]} & other-children] children
                    child-tick   (get ticks id)]
@@ -243,13 +243,13 @@
                  (let [slen         (:height stem)
                        blen         (:width branch)
                        tlen         (+ slen blen) ;;
-                       stemdur      (* 0.45 (/ slen tlen))
-                       branchdur    (* 0.45 (/ blen tlen))]
-                   {:stem   {:delay    (- child-tick stemdur branchdur .025)
+                       stemdur      (* 0.25 (/ slen tlen))
+                       branchdur    (* 0.25 (/ blen tlen))]
+                   {:stem   {:delay    (- child-tick stemdur branchdur)
                              :duration stemdur}
-                    :branch {:delay    (- child-tick branchdur 0.025)
+                    :branch {:delay    (- child-tick branchdur)
                              :duration branchdur}})
-                 {:stem {:delay (- child-tick 0.5) :duration .5}}))))))
+                 {:stem {:delay (- child-tick 0.25) :duration .25}}))))))
 
 (defn draw-node
   [ticks [{:keys [id label] :as node} {:keys [root body stem branch] :as parts}]]
@@ -260,7 +260,7 @@
      (when stem ^{:key [id :stem]} [draw-rect [draw-edge stem] stem])
      (when branch ^{:key [id :branch]} [draw-rect [draw-edge branch] branch])]))
 
-(def tick-len 400) ;
+(def tick-len 600) ;
 
 (defn wrap-part
   [id choreo transition part-id part child]
