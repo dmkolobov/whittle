@@ -74,20 +74,17 @@
 
 (defn spread-trees
   [children]
-  (let [[first & siblings] children]
-    (if (seq siblings)
-      (reduce (fn [row {:keys [width] :as child}]
-                (let [last-dt (:delta (last row))
-                      overlap (find-delta (:rcontour (last row))
-                                          (push-contour (:lcontour child) last-dt))
-                      delta   (+ last-dt overlap gap)]
-                  (conj row
-                        (-> child
-                            (update :delta + delta);; this delta value will be the final x coordinate
-                            (push-and-merge-contours delta (:lcontour (last row)) (:rcontour (last row)))))))
-              [first]
-              siblings)
-      [first])))
+  (reduce (fn [row {:keys [width] :as child}]
+            (let [last-dt (:delta (last row))
+                  overlap (find-delta (:rcontour (last row))
+                                      (push-contour (:lcontour child) last-dt))
+                  delta   (+ last-dt overlap gap)]
+              (conj row
+                    (-> child
+                        (update :delta + delta);; this delta value will be the final x coordinate
+                        (push-and-merge-contours delta (:lcontour (last row)) (:rcontour (last row)))))))
+          [(first children)]
+          (rest children)))
 
 (defn center-node
   "Returns a vector [min-x max-x] representing the x-bounds of the given node
