@@ -20,7 +20,7 @@
 (defn layout-node? [x] (instance? LayoutNode x))
 
 (defn make-child
-  [tree & {:keys [branch? children measurements labels id-fn default-id level] :as args}]
+  [tree {:keys [branch? children measurements labels id-fn default-id level] :as args}]
   (if (layout-node? tree)
     tree
     (let [id             (or (id-fn tree) default-id)
@@ -57,9 +57,8 @@
 (defn intersect-contour
   "Given two contours, return a sorted sequence of levels contained in both."
   [contour-1 contour-2]
-  (sort
-    (set/intersection (set (keys contour-1))
-                      (set (keys contour-2)))))
+  (set/intersection (set (keys contour-1))
+                    (set (keys contour-2))))
 
 (defn contour-center
   "Given a left contour and a right contour, return the point centered between
@@ -76,7 +75,7 @@
 
 (defn pair-contours
   [left-tree-rcontour right-tree-lcontour]
-  (let [common-levels (intersect-contour left-tree-rcontour right-tree-lcontour)]
+  (let [common-levels (sort (intersect-contour left-tree-rcontour right-tree-lcontour))]
     (map list
          (map (partial get left-tree-rcontour)
               common-levels)
@@ -100,10 +99,8 @@
   "This function simulates threads."
   [node delta lcontour rcontour]
   (-> node
-      (update :lcontour push-contour delta)
-      (update :rcontour push-contour delta)
-      (update :lcontour #(merge-f min lcontour %))
-      (update :rcontour #(merge-f max rcontour %))))
+      (update :lcontour #(merge-f min lcontour (push-contour % delta)))
+      (update :rcontour #(merge-f max rcontour (push-contour % delta)))))
 
 (defn spread-trees
   [children]
@@ -152,7 +149,7 @@
               #(assoc %1 :children %2)
               (if (layout-node? tree)
                 tree
-                (apply make-child tree (concat args [:level 0])))))
+                (make-child tree (assoc args :level 0)))))
 
 (defn ->layout-nodes
   [loc args]
@@ -161,11 +158,11 @@
                    (zip/edit (fn [{:keys [children id level] :as node}]
                                (assoc node
                                  :children
-                                 (map-indexed #(apply make-child
+                                 (map-indexed #(make-child
                                                     %2
-                                                    (concat args
-                                                            [:default-id (conj id %1)]
-                                                            [:level       (inc level)]))
+                                                    (assoc args
+                                                      :default-id (conj id %1)
+                                                      :level      (inc level)))
                                               children)))))]
       (if (zip/end? (zip/next loc'))
         loc
@@ -247,11 +244,12 @@
 
 (defn tidy
   [tree & args]
-  (-> tree
-      (layout-zipper args)
-      (->layout-nodes args)
-      (space-nodes)
-      (position-nodes))) ;
+  (let [args (apply hash-map args)]
+    (-> tree
+        (layout-zipper args)
+        (->layout-nodes args)
+        (space-nodes)
+        (position-nodes)))) ;
 
 (defn plot-branch
   [{:keys [edge-stroke edge-height]} {:keys [children] :as node}]
