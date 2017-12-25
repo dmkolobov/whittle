@@ -76,8 +76,10 @@
                 (let [{:keys [tree tree-labels tree-measures]} db]
                   {:db (assoc db
                          :tidy-tree (tidy tree
-                                          :id-fn tree-index
-                                          :labels tree-labels
+                                          :id-fn        tree-index
+                                          :branch?      hiccup-tree?
+                                          :children     rest
+                                          :labels       tree-labels
                                           :measurements tree-measures)
                          :tree-labels {}
                          :measurements {})

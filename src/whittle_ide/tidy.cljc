@@ -20,10 +20,10 @@
 (defn layout-node? [x] (instance? LayoutNode x))
 
 (defn make-child
-  [parse-tree & {:keys [measurements labels id-fn default-id level] :as args}]
-  (if (layout-node? parse-tree)
-    parse-tree
-    (let [id             (or (id-fn parse-tree) default-id)
+  [tree & {:keys [branch? children measurements labels id-fn default-id level] :as args}]
+  (if (layout-node? tree)
+    tree
+    (let [id             (or (id-fn tree) default-id)
           [width height] (get measurements id)
           label          (get labels id)]
       (map->LayoutNode
@@ -38,7 +38,7 @@
          :lcontour {level 0}
          :rcontour {level width}
 
-         :children (when (hiccup-tree? parse-tree) (rest parse-tree))}))))
+         :children (when (branch? tree) (children tree))}))))
 
 (defn merge-f
   "Merges maps m1 and m2. Whenever two values v1 and v2 exist for the same key,
@@ -161,13 +161,13 @@
 (defn node-branch? [x] (and (layout-node? x) (seq (:children x))))
 
 (defn layout-zipper
-  [parse-tree args]
+  [tree args]
   (zip/zipper node-branch?
               (fn [{:keys [children]}] children)
               #(assoc %1 :children %2)
-              (if (layout-node? parse-tree)
-                parse-tree
-                (apply make-child parse-tree (concat args [:level 0])))))
+              (if (layout-node? tree)
+                tree
+                (apply make-child tree (concat args [:level 0])))))
 
 (defn ->layout-nodes
   [loc args]
@@ -206,18 +206,14 @@
       (recur
         (-> loc
             (zip/edit (fn [{:keys [delta shift level width height] :as node}]
-                        (let [y           (* level 33)
-                              edge-origin [(+ delta (/ width 2))
-                                           (+ y height)]]
                           (-> node
                             (assoc :x delta)
                             (update :children
                                     (fn [children]
                                       (map (fn [child]
                                              (-> child
-                                                 (assoc :edge-origin edge-origin)
                                                  (update :delta + delta (- shift))))
-                                           children)))))))
+                                           children))))))
             (zip/next))))))
 
 (defn node-seq-zipper
