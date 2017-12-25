@@ -50,35 +50,37 @@
          (map (partial get left-tree-rcontour) common-levels)
          (map (partial get right-tree-lcontour) common-levels))))
 
-(defn find-delta
-  [left-rcontour right-lcontour]
+(defn find-overlap
+  [left-rcontour right-lcontour delta]
   (let [pairs (pair-contours left-rcontour right-lcontour)]
     (if-let [max-overlap (->> pairs
                               (filter (partial apply >=))
-                              (map (partial apply -))
+                              (map #(- (first %1) (second %1) delta))
                               (apply max))]
       max-overlap
       0)))
 
 (def gap 10)
 
+(def merge-lcontour (partial merge-f min))
+(def merge-rcontour (partial merge-f max))
+
 (defn push-and-merge-contours
   "This function simulates threads."
   [node delta lcontour rcontour]
   (-> node
-      (update :lcontour #(merge-f min lcontour (push-contour % delta)))
-      (update :rcontour #(merge-f max rcontour (push-contour % delta)))))
+      (update :delta + delta)
+      (update :lcontour #(merge-lcontour lcontour (push-contour % delta)))
+      (update :rcontour #(merge-rcontour rcontour (push-contour % delta)))))
 
 (defn spread-trees
   [children]
   (reduce (fn [row child]
             (let [{:keys [delta lcontour rcontour]} (last row)
-                  overlap (find-delta rcontour (push-contour (:lcontour child) delta))
+                  overlap (find-overlap rcontour (:lcontour child) delta)
                   delta   (+ delta overlap gap)]
               (conj row
-                    (-> child
-                        (update :delta + delta);; this delta value will be the final x coordinate
-                        (push-and-merge-contours delta lcontour rcontour)))))
+                    (push-and-merge-contours child delta lcontour rcontour))))
           [(first children)]
           (rest children)))
 
