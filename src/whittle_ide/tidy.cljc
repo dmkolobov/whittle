@@ -28,11 +28,10 @@
           label          (get labels id)]
       (map->LayoutNode
         {:id       id
+
          :level    level
          :label    label
 
-         ;:delta    (- (/ width 2))
-         ;:shift    (/ width 2)
          :width    width
          :height   height
 
@@ -136,12 +135,6 @@
               siblings)
       [first])))
 
-;;   a
-;;  / \
-;; b   d
-;;    / \
-;;   c   e
-
 (defn center-node
   "Returns a vector [min-x max-x] representing the x-bounds of the given node
    when centered horizontally about 'x'."
@@ -157,20 +150,12 @@
         [min-x max-x] (center-node node (contour-center lcontour rcontour))]
     (-> node
         (assoc :shift min-x)
-        ;(assoc :delta (- width))
-        ;(assoc :delta 0)
         (assoc :lcontour
                (push-contour (assoc lcontour level min-x)
                              (- min-x)))
         (assoc :rcontour
                (push-contour (assoc rcontour level max-x)
                              (- min-x)))
-        ;(assoc :lcontour lcontour)
-        ;(assoc :rcontour rcontour)
-        ;(update :lcontour push-contour (- max-x))
-        ;(update :rcontour push-contour (- min-x))
-        ;(update :lcontour assoc level min-x)
-        ;(update :rcontour assoc level max-x)
         (assoc :children children))))
 
 (defn node-branch? [x] (and (layout-node? x) (seq (:children x))))

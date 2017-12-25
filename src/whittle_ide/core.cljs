@@ -1,7 +1,5 @@
 (ns whittle-ide.core
   (:require [cljs.pprint :refer [pprint] :as pprint]
-            ;[cljsjs.react]
-            ;[cljsjs.react-dom]
 
             [cljsjs.react-transition-group]
 
@@ -41,8 +39,6 @@
   "let square(x) ={x*x},
        sumsq(a,b)={square(a)+square(b)}:
      sumsq(2,3)")
-
-(def program-2 "2+2+2")
 
 (defn label-tree
   [result]
@@ -86,118 +82,6 @@
                          :tree-labels {}
                          :measurements {})
                    :dispatch [:prepare-drawing]})))
-
-
-(def stem-stroke 5)
-(def stem-height 20)
-
-(def black-h [:div.black-h])
-(def black-v [:div.black-v])
-
-(def duration 900)
-
-(defn node->rects
-  [{:keys [id y width height children label level]
-     :or   {y 0}
-     :as   node}]
-  (let [cx    (paint-rect/center-x node)]
-    [node
-     (merge (when (not= level 0)
-             {:root (center cx
-                            {:width      stem-stroke
-                             :height     (+ stem-height y)
-                             :child      black-v
-                             :fix-width? true})})
-
-           {:node (center cx
-                          {:width  width
-                           :height height
-                           :child  label})}
-
-          (when (seq children)
-            (let [cxs   (map paint-rect/center-x children)
-                  min-x (apply min cxs)
-                  max-x (apply max cxs)
-                  width (- max-x min-x)]
-              {:stem   (center cx
-                               {:width      stem-stroke
-                                :fix-width? true
-                                :height     stem-height
-                                :child      black-v})
-
-               :branch {:x           (- min-x (/ stem-stroke 2))
-                        :width       (+ width stem-stroke)
-                        :height      stem-stroke
-                        :fix-height? true
-                        :cx-open     cx
-                        :child       black-h}})))]))
-
-(defn choreograph-node
-  [{:keys [id child-tick tick children]} {:keys [root node stem branch] :as parts}]
-  (let [start-time  (* duration tick)
-        [stem-time branch-time] (when (some? child-tick)
-                                  (let [child-start  (* duration child-tick)
-                                        l-stem       (:height stem)
-                                        l-branch     (:height branch)
-                                        stem-dur     (* 0.25 duration (/ 1 l-branch))
-                                        branch-dur   (* 0.25 duration (/ 1 l-stem))]
-                                    [(- child-start stem-dur branch-dur)
-                                     (- child-start branch-dur)]))]
-    (cond-> []
-            root            (conj (assoc root
-                                    :id [id :root]
-                                    :timeout (+ start-time (* 0.25 duration))))
-            node            (conj (assoc node
-                                    :id [id :node]
-                                    :timeout (+ start-time (* 0.5 duration))))
-            (seq children) (conj (assoc stem
-                                   :id [id :stem]
-                                   :timeout stem-time)
-                                 (assoc branch
-                                   :id [id :branch]
-                                   :timeout branch-time)))))
-
-(defn has-type? [type] (fn [{:keys [id]}] (= type (second id))))
-
-(defn ->paint-list
-  [row-rects]
-  (concat (filter (has-type? :root) row-rects)
-          (filter (has-type? :node) row-rects)
-          (filter (has-type? :stem) row-rects)
-          (filter (has-type? :branch) row-rects)))
-
-(defn tree->nodes
-  [tidy-tree]
-  (let [ticks (tidy/choreograph tidy-tree)]
-    (->> (tidy/node-seq tidy-tree)
-         (map (fn [{:keys [children] :as node}]
-                (assoc node
-                  :tick       (get ticks (:id node))
-                  :child-tick (when (seq children)
-                                (get ticks (:id (first children)))))))
-         (group-by :level))))
-
-(reg-event-db :reflow-tree
-              (fn [{:keys [tidy-tree] :as db}]
-                (loop [baseline 0
-                       rows     (tree->nodes tidy-tree)
-                       rects    []]
-                  (if (seq rows)
-                    (let [[level nodes] (first rows)
-                          row-rects (->> nodes
-                                         (sort-by :x)
-                                         (map node->rects)
-                                         (map (fn [[node parts]]
-                                                [node
-                                                 (zipmap (keys parts)
-                                                         (paint-rect/space baseline
-                                                                           (vals parts)))]))
-                                         (mapcat (partial apply choreograph-node)))]
-                      (recur (apply paint-rect/find-baseline row-rects)
-                             (rest rows)
-                             (into rects (->paint-list row-rects))))
-                    (assoc db
-                      :paint-list rects)))))
 
 (reg-sub :debug identity)
 (reg-sub :labels (fn [db] (get db :tree-labels)))
@@ -251,15 +135,6 @@
                              :duration branchdur}})
                  {:stem {:delay (- child-tick 0.25) :duration .25}}))))))
 
-(defn draw-node
-  [ticks [{:keys [id label] :as node} {:keys [root body stem branch] :as parts}]]
-  (let [choreo (choreograph-parts ticks node parts)]
-    (println choreo)
-    [(when root  ^{:key [id :root]} [draw-rect [draw-edge root] root])
-     ^{:key [id :body]} [draw-rect label body]
-     (when stem ^{:key [id :stem]} [draw-rect [draw-edge stem] stem])
-     (when branch ^{:key [id :branch]} [draw-rect [draw-edge branch] branch])]))
-
 (def tick-len 600) ;
 
 (defn wrap-part
@@ -296,29 +171,6 @@
              (->> rects
                   (mapcat (partial animate-node ticks))
                   (filter some?)))))])))
-
-
-(defn draw
-  []
-  (let [drawing (subscribe [:drawing])]
-    (fn []
-      [:div
-       (when-let [d @drawing]
-         (let [{:keys [ticks rects]} d]
-           (doall
-             (->> rects
-                  (mapcat (partial draw-node ticks))
-                  (filter some?)))))])))
-
-
-
-(defn draw-tidy
-  []
-  (let [paint-list (subscribe [:paint-list])]
-    (fn []
-      (when-let [plist @paint-list]
-        (println "plist type" (type plist))
-        [paint-rect/paint plist]))))
 
 (defn measure
   [& {:keys [child on-measure]}]
@@ -400,108 +252,6 @@
            [:pre [:code program-1]]
            [:div [draw-tree @state-idx state]]]
           [:div "..."])])))
-
-(defn test-concept
-  []
-  (let [state (reagent/atom 0)]
-    (fn []
-      @state
-      [:div
-       [:a {:href "#" :on-click (fn [_] (swap! state inc))} "shuffle"]
-        [:> TransitionGroup
-         {:component :ul}
-         (doall
-           (for [x (->> '[a b c d e] (shuffle) (random-sample 0.5))]
-             ^{:key x}
-             [:> Transition
-              {:timeout     {"enter" 3000
-                             "exit"  3000}
-               :appear      true}
-              (fn [state]
-                (reagent/as-element
-                  [:li
-                   {:style {:opacity (if (= state "entered")
-                                        1
-                                        0)
-                            :transition "opacity 1s ease-in"}}
-                   (str x)]))]))]])))
-
-(defn grid
-  [rows cols size]
-  (map conj
-       (for [y (take-nth 2 (range 0 (* rows size 2) size))
-             x (take-nth 2 (range 0 (* cols size 2) size))]
-         [x y])
-       (range (* rows cols))))
-
-(defn grid-block
-  [size on-click]
-  [:div {:style {:display "inline-block"
-                 :position "absolute"
-                 :width  size
-                 :height size
-                 :background-color "red"}
-         :on-click on-click}])
-
-(defn drop-test-1
-  []
-  (let [show?  (reagent/atom false)
-        y-atom (reagent/atom 100)
-        rows   16
-        cols   16
-        size   20
-        delay  1000
-        duration 250
-        on-click #(swap! y-atom + size)
-        simul      8
-        timeout  (fn [{:keys [id]}]
-                   (+ delay (* (/ 1 simul) duration id) duration))]
-    (fn []
-      [:div
-       [:a {:href "#" :on-click #(swap! show? not)} "Toggle"]
-       [anim/run-transitions {:timeout-fn timeout}
-        (doall
-          (for [[x y id] (if @show? (grid rows cols size) (list))]
-            (let [z-offset   (/ id 1000)
-                  open-delay (+ delay (* (/ 1 simul) duration id))
-                  move-delay (* (/ 1 simul) duration (- (* rows cols) id))]
-              [anim/moves
-               {:id       id
-                :z        z-offset
-                :x        x
-                :y        (+ y @y-atom)
-                :child    [(if (even? id) anim/opens-horiz anim/opens-down)
-                           {:width    size
-                            :height   size
-                            :z        (+ z-offset 0.00001)
-                            :duration duration
-                            :delay    open-delay
-                            :child    [grid-block size on-click]}]
-                :duration duration
-                :delay    move-delay}])))]])))
-
-
-
-
-(defn snake-test
-  []
-  (let [x-at (atom 20)
-        size 20
-        step 40
-        move-right #(swap! x-at + step)
-        move-left  #(swap! x-at - step)]
-    (fn []
-      [:div
-       [:a {:href "#" :on-click move-left} "<"]
-       [:a {:href "#" :on-click move-right} ">"]
-       [anim/snake {:style    {:background-color "red"
-                               :display "inline-block"}
-                    :x        @x-at
-                    :y        50
-                    :width    size
-                    :height   size
-                    :delay    0
-                    :duration 300}]])))
 
 (reagent/render-component [hello-world]
                           (. js/document (getElementById "app")))
