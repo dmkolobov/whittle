@@ -1,18 +1,8 @@
 (ns whittle-ide.tidy
-  (:require [whittle.inspect :refer [hiccup-tree? tree-index]]
-            [whittle-ide.rect :as rect]
+  (:require [whittle-ide.rect :as rect]
+            [whittle-ide.util :refer [common-keys merge-f fast-forward]]
             [clojure.zip :as zip]
             [clojure.set :as set]))
-
-(defn fast-forward
-  [loc]
-  (if (zip/end? loc) loc (recur (zip/next loc))))
-
-(defn rewind
-  [loc]
-  (if (zip/end? loc)
-    loc
-    (if-let [prev (zip/prev loc)] (recur prev) loc)))
 
 (defrecord LayoutNode
   [id level label x y width height lcontour rcontour children delta shift])
@@ -40,31 +30,11 @@
 
          :children (when (branch? tree) (children tree))}))))
 
-(defn merge-f
-  "Merges maps m1 and m2. Whenever two values v1 and v2 exist for the same key,
-  take the value returned by (f v1 v2)."
-  [f m1 m2]
-  (reduce (fn [m level]
-            (assoc m
-              level (if (and (contains? m1 level)
-                             (contains? m2 level))
-                      (f (get m1 level) (get m2 level))
-                      (get m1 level (get m2 level)))))
-          {}
-          (set/union (set (keys m1))
-                     (set (keys m2))))) ;
-
-(defn intersect-contour
-  "Given two contours, return a sorted sequence of levels contained in both."
-  [contour-1 contour-2]
-  (set/intersection (set (keys contour-1))
-                    (set (keys contour-2))))
-
 (defn contour-center
   "Given a left contour and a right contour, return the point centered between
   their topmost limits."
   [lcontour rcontour]
-  (let [level (apply min (intersect-contour lcontour rcontour))]
+  (let [level (apply min (common-keys lcontour rcontour))]
     (/ (- (get rcontour level) (get lcontour level)) 2.0)))
 
 (defn push-contour
@@ -75,7 +45,7 @@
 
 (defn pair-contours
   [left-tree-rcontour right-tree-lcontour]
-  (let [common-levels (sort (intersect-contour left-tree-rcontour right-tree-lcontour))]
+  (let [common-levels (sort (common-keys left-tree-rcontour right-tree-lcontour))]
     (map list
          (map (partial get left-tree-rcontour)
               common-levels)
@@ -153,20 +123,15 @@
 
 (defn ->layout-nodes
   [loc args]
-  (loop [loc loc]
-    (let [loc' (-> loc
-                   (zip/edit (fn [{:keys [children id level] :as node}]
-                               (assoc node
-                                 :children
-                                 (map-indexed #(make-child
-                                                    %2
-                                                    (assoc args
-                                                      :default-id (conj id %1)
-                                                      :level      (inc level)))
-                                              children)))))]
-      (if (zip/end? (zip/next loc'))
-        loc
-        (recur (zip/next loc'))))))
+  (fast-forward loc (fn [{:keys [children id level] :as node}]
+                      (assoc node
+                        :children
+                        (map-indexed #(make-child
+                                       %2
+                                       (assoc args
+                                         :default-id (conj id %1)
+                                         :level      (inc level)))
+                                     children)))));;
 
 (defn space-nodes
   [loc]
