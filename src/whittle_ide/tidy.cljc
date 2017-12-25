@@ -73,20 +73,6 @@
   (let [level (apply min (intersect-contour lcontour rcontour))]
     (/ (- (get rcontour level) (get lcontour level)) 2.0)))
 
-(defn find-lcontour
-  [children]
-  (reduce (partial merge-f min)
-          {}
-          (concat (map :lcontour children)
-                  (map :rcontour children))))
-
-(defn find-rcontour
-  [children]
-  (reduce (partial merge-f max)
-          {}
-          (concat (map :lcontour children)
-                  (map :rcontour children))))
-
 (defn push-contour
   [contour delta]
   (into {}
@@ -115,22 +101,29 @@
 
 (def gap 10)
 
+(defn push-and-merge-contours
+  "This function simulates threads."
+  [node delta lcontour rcontour]
+  (-> node
+      (update :lcontour push-contour delta)
+      (update :rcontour push-contour delta)
+      (update :lcontour #(merge-f min lcontour %))
+      (update :rcontour #(merge-f max rcontour %))))
+
 (defn spread-trees
   [children]
   (let [[first & siblings] children]
     (if (seq siblings)
       (reduce (fn [row {:keys [width] :as child}]
                 (let [last-dt (:delta (last row))
-                      overlap (find-delta (push-contour (find-rcontour row)
-                                                        (- last-dt))
-                                          (:lcontour child))
+                      overlap (find-delta (:rcontour (last row))
+                                          (push-contour (:lcontour child) last-dt))
                       delta   (+ last-dt overlap gap)]
                   (conj row
                         (-> child
                             (assoc :overlap overlap)
                             (update :delta + delta);; this delta value will be the final x coordinate
-                            (update :lcontour push-contour delta)
-                            (update :rcontour push-contour delta)))))
+                            (push-and-merge-contours delta (:lcontour (last row)) (:rcontour (last row)))))))
               [first]
               siblings)
       [first])))
@@ -145,17 +138,15 @@
 (defn layout-node
   [{:keys [level width] :as node} children]
   (let [children      (spread-trees children)
-        lcontour      (find-lcontour children)
-        rcontour      (find-rcontour children)
+        lcontour      (:lcontour (last children))
+        rcontour      (:rcontour (last children))
         [min-x max-x] (center-node node (contour-center lcontour rcontour))]
     (-> node
         (assoc :shift min-x)
         (assoc :lcontour
-               (push-contour (assoc lcontour level min-x)
-                             (- min-x)))
+               (push-contour (assoc lcontour level min-x) (- min-x)))
         (assoc :rcontour
-               (push-contour (assoc rcontour level max-x)
-                             (- min-x)))
+               (push-contour (assoc rcontour level max-x) (- min-x)))
         (assoc :children children))))
 
 (defn node-branch? [x] (and (layout-node? x) (seq (:children x))))
