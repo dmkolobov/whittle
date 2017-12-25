@@ -15,7 +15,7 @@
     (if-let [prev (zip/prev loc)] (recur prev) loc)))
 
 (defrecord LayoutNode
-  [id level label width height lcontour rcontour children delta shift])
+  [id level label x y width height lcontour rcontour children delta shift])
 
 (defn layout-node? [x] (instance? LayoutNode x))
 
