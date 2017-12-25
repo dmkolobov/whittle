@@ -169,7 +169,7 @@
                 parse-tree
                 (apply make-child parse-tree (concat args [:level 0])))))
 
-(defn replace-trees
+(defn ->layout-nodes
   [loc args]
   (loop [loc loc]
     (let [loc' (-> loc
@@ -186,7 +186,7 @@
         loc
         (recur (zip/next loc'))))))
 
-(defn replace-nodes
+(defn space-nodes
   [loc]
   (let [loc' (if (zip/branch? loc)
                (zip/replace loc (layout-node (zip/node loc)
@@ -268,9 +268,9 @@
   [tree & args]
   (-> tree
       (layout-zipper args)
-      (replace-trees args)
-      (replace-nodes)
-      (position-nodes)))
+      (->layout-nodes args)
+      (space-nodes)
+      (position-nodes))) ;
 
 (defn plot-branch
   [{:keys [edge-stroke edge-height]} {:keys [children] :as node}]
