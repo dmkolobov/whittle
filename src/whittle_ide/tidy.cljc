@@ -47,11 +47,8 @@
   [left-tree-rcontour right-tree-lcontour]
   (let [common-levels (sort (common-keys left-tree-rcontour right-tree-lcontour))]
     (map list
-         (map (partial get left-tree-rcontour)
-              common-levels)
-
-         (map (partial get right-tree-lcontour)
-              common-levels))))
+         (map (partial get left-tree-rcontour) common-levels)
+         (map (partial get right-tree-lcontour) common-levels))))
 
 (defn find-delta
   [left-rcontour right-lcontour]
@@ -74,15 +71,14 @@
 
 (defn spread-trees
   [children]
-  (reduce (fn [row {:keys [width] :as child}]
-            (let [last-dt (:delta (last row))
-                  overlap (find-delta (:rcontour (last row))
-                                      (push-contour (:lcontour child) last-dt))
-                  delta   (+ last-dt overlap gap)]
+  (reduce (fn [row child]
+            (let [{:keys [delta lcontour rcontour]} (last row)
+                  overlap (find-delta rcontour (push-contour (:lcontour child) delta))
+                  delta   (+ delta overlap gap)]
               (conj row
                     (-> child
                         (update :delta + delta);; this delta value will be the final x coordinate
-                        (push-and-merge-contours delta (:lcontour (last row)) (:rcontour (last row)))))))
+                        (push-and-merge-contours delta lcontour rcontour)))))
           [(first children)]
           (rest children)))
 
@@ -99,24 +95,20 @@
         lcontour      (:lcontour (last children))
         rcontour      (:rcontour (last children))
         [min-x max-x] (center-node node (contour-center lcontour rcontour))]
-    (-> node
-        (assoc :shift min-x)
-        (assoc :lcontour
-               (push-contour (assoc lcontour level min-x) (- min-x)))
-        (assoc :rcontour
-               (push-contour (assoc rcontour level max-x) (- min-x)))
-        (assoc :children children))))
+    (assoc node
+      :shift    min-x
+      :lcontour (push-contour (assoc lcontour level min-x) (- min-x))
+      :rcontour (push-contour (assoc rcontour level max-x) (- min-x))
+      :children children)))
 
 (defn node-branch? [x] (and (layout-node? x) (seq (:children x))))
 
 (defn layout-zipper
-  [tree args]
+  [tidy]
   (zip/zipper node-branch?
-              (fn [{:keys [children]}] children)
+              :children
               #(assoc %1 :children %2)
-              (if (layout-node? tree)
-                tree
-                (make-child tree (assoc args :level 0)))))
+              tidy))
 
 (defn ->layout-nodes
   [loc args]
@@ -155,13 +147,6 @@
                                                  (update :delta + delta (- shift))))
                                            children)))))))
 
-(defn node-seq-zipper
-  [tidy]
-  (zip/zipper node-branch?
-              :children
-              #(assoc %1 :children %2)
-              tidy))
-
 (defn add-ticks
   "Given a location in the tree, the current tick, and a map of ticks, returns
   a new map of ticks with an entry for each sibling of the location node, including
@@ -177,7 +162,7 @@
   "Given a tidy tree, return a map where keys are node ids and values
   are node ticks."
   [tidy]
-  (loop [loc          (node-seq-zipper tidy)
+  (loop [loc          (layout-zipper tidy)
          current-tick 0
          ticks        {}]
      (if (zip/end? loc)
@@ -193,8 +178,8 @@
 (defn tidy
   [tree & args]
   (let [args (apply hash-map args)]
-    (-> tree
-        (layout-zipper args)
+    (-> (make-child tree (assoc args :level 0))
+        (layout-zipper)
         (->layout-nodes args)
         (space-nodes)
         (position-nodes)
@@ -240,7 +225,7 @@
   Each part has an :x, :y, :width, and :height."
   [tidy-tree & opts]
   (loop [baseline 0
-         rows     (->> (node-seq-zipper tidy-tree)
+         rows     (->> (layout-zipper tidy-tree)
                        (zip-seq)
                        (group-by :level)
                        (sort-by first)
