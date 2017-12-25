@@ -46,18 +46,13 @@
   [f m1 m2]
   (reduce (fn [m level]
             (assoc m
-              level (cond (and (contains? m1 level)
-                               (contains? m2 level))
-                          (f (get m1 level) (get m2 level))
-
-                          (contains? m1 level)
-                          (get m1 level)
-
-                          (contains? m2 level)
-                          (get m2 level))))
+              level (if (and (contains? m1 level)
+                             (contains? m2 level))
+                      (f (get m1 level) (get m2 level))
+                      (get m1 level (get m2 level)))))
           {}
           (set/union (set (keys m1))
-                     (set (keys m2)))))
+                     (set (keys m2))))) ;
 
 (defn intersect-contour
   "Given two contours, return a sorted sequence of levels contained in both."
@@ -121,7 +116,6 @@
                       delta   (+ last-dt overlap gap)]
                   (conj row
                         (-> child
-                            (assoc :overlap overlap)
                             (update :delta + delta);; this delta value will be the final x coordinate
                             (push-and-merge-contours delta (:lcontour (last row)) (:rcontour (last row)))))))
               [first]
