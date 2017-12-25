@@ -75,12 +75,13 @@
               (fn [{:keys [db]}]
                 (let [{:keys [tree tree-labels tree-measures]} db]
                   {:db (assoc db
-                         :tidy-tree (tidy tree
-                                          :id-fn        tree-index
-                                          :branch?      hiccup-tree?
-                                          :children     rest
-                                          :labels       tree-labels
-                                          :measurements tree-measures)
+                         :tidy-tree (time
+                                      (tidy tree
+                                            :id-fn        tree-index
+                                            :branch?      hiccup-tree?
+                                            :children     rest
+                                            :labels       tree-labels
+                                            :measurements tree-measures))
                          :tree-labels {}
                          :measurements {})
                    :dispatch [:prepare-drawing]})))
