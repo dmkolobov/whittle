@@ -1,6 +1,6 @@
 (ns whittle-ide.tidy
   (:require [whittle-ide.rect :as rect]
-            [whittle-ide.util :refer [common-keys merge-f fast-forward]]
+            [whittle-ide.util :refer [common-keys merge-f fast-forward zip-seq]]
             [clojure.zip :as zip]
             [clojure.set :as set]))
 
@@ -190,15 +190,6 @@
                 (inc current-tick)
                 (add-ticks loc ticks current-tick))))))
 
-(defn node-seq
-  [tidy]
-  (loop [nodes []
-         loc   (node-seq-zipper tidy)]
-    (if (zip/end? loc)
-      nodes
-      (recur (conj nodes (zip/node loc))
-             (zip/next loc)))))
-
 (defn tidy
   [tree & args]
   (let [args (apply hash-map args)]
@@ -249,8 +240,8 @@
   Each part has an :x, :y, :width, and :height."
   [tidy-tree & opts]
   (loop [baseline 0
-         rows     (->> tidy-tree
-                       (node-seq)
+         rows     (->> (node-seq-zipper tidy-tree)
+                       (zip-seq)
                        (group-by :level)
                        (sort-by first)
                        (map second))

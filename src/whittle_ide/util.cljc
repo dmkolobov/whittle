@@ -26,5 +26,16 @@
   [loc f]
   (let [loc' (zip/edit loc f)]
     (if (zip/end? (zip/next loc'))
-      loc
+      loc'
       (recur (zip/next loc') f))))
+
+(defn zip-seq
+  "Given a zipper location, return the sequence of tree nodes in depth
+  first order."
+  [loc]
+  (loop [nodes []
+         loc   loc]
+    (if (zip/end? loc)
+      nodes
+      (recur (conj nodes (zip/node loc))
+             (zip/next loc)))))
