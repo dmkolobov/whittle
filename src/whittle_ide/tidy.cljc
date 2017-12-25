@@ -144,12 +144,8 @@
 
 (defn position-nodes
   [loc]
-  (loop [loc loc]
-    (if (zip/end? loc)
-      (zip/root loc)
-      (recur
-        (-> loc
-            (zip/edit (fn [{:keys [delta shift level width height] :as node}]
+  (fast-forward loc
+                (fn [{:keys [delta shift] :as node}]
                           (-> node
                             (assoc :x delta)
                             (update :children
@@ -157,8 +153,7 @@
                                       (map (fn [child]
                                              (-> child
                                                  (update :delta + delta (- shift))))
-                                           children))))))
-            (zip/next))))))
+                                           children)))))))
 
 (defn node-seq-zipper
   [tidy]
@@ -211,7 +206,8 @@
         (layout-zipper args)
         (->layout-nodes args)
         (space-nodes)
-        (position-nodes)))) ;
+        (position-nodes)
+        (zip/root)))) ;
 
 (defn plot-branch
   [{:keys [edge-stroke edge-height]} {:keys [children] :as node}]
