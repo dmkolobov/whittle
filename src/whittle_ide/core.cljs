@@ -183,7 +183,7 @@
      (fn [owner]
        (let [dom  (reagent/dom-node owner)
              rect (.getBoundingClientRect dom)]
-         (on-measure [(.-offsetWidth dom) (.-offsetHeight dom)])))
+         (on-measure [(.-width rect) (.-height rect)])))
      :reagent-render (fn [& _] child)}))
 
 (defn measure-labels
