@@ -131,7 +131,9 @@
 
 (defn position-nodes
   [loc]
-  (fast-forward loc
+  (fast-forward (zip/edit loc
+                          (fn [{:keys [lcontour] :as node}]
+                            (update node :delta - (apply min (vals lcontour)))))
                 (fn [{:keys [delta shift] :as node}]
                           (-> node
                             (assoc :x delta)

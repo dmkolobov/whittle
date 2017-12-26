@@ -202,8 +202,7 @@
        (when-let [labels @labels]
          [:div.hidden [measure-labels labels]])
        [:div.tidy-tree
-          {:style {:position "absolute"
-                   :transform "translateX(400px)"}}
+          {:style {:position "absolute"}}
           [animate]]])))
 
 (reg-sub :state
