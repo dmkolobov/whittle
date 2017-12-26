@@ -79,6 +79,7 @@
                                       (tidy tree
                                             :id-fn        tree-index
                                             :branch?      hiccup-tree?
+                                            :gap          10
                                             :children     rest
                                             :labels       tree-labels
                                             :measurements tree-measures))

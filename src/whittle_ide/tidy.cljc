@@ -60,8 +60,6 @@
       max-overlap
       0)))
 
-(def gap 10)
-
 (def merge-lcontour (partial merge-f min))
 (def merge-rcontour (partial merge-f max))
 
@@ -74,7 +72,7 @@
       (update :rcontour #(merge-rcontour rcontour (push-contour % delta)))))
 
 (defn spread-trees
-  [children]
+  [children {:keys [gap]}]
   (reduce (fn [row child]
             (let [{:keys [delta lcontour rcontour]} (last row)
                   overlap (find-overlap rcontour (:lcontour child) delta)
@@ -92,8 +90,8 @@
    (+ x (/ width 2.0))])
 
 (defn layout-node
-  [{:keys [level width] :as node} children]
-  (let [children      (spread-trees children)
+  [{:keys [level width] :as node} children args]
+  (let [children      (spread-trees children args)
         lcontour      (:lcontour (last children))
         rcontour      (:rcontour (last children))
         [min-x max-x] (center-node node (contour-center lcontour rcontour))]
@@ -125,15 +123,16 @@
                                      children)))));;
 
 (defn space-nodes
-  [loc]
+  [loc args]
   (let [loc' (if (zip/branch? loc)
                (zip/replace loc (layout-node (zip/node loc)
-                                             (zip/children loc)))
+                                             (zip/children loc)
+                                             args))
                loc)]
   (if-let [prev (zip/prev loc')]
-    (recur prev)
+    (recur prev args)
     (if-let [up (zip/up loc')]
-      (recur up)
+      (recur up args)
       loc'))))
 
 (defn position-nodes
@@ -183,7 +182,7 @@
     (-> (make-child tree (assoc args :level 0))
         (layout-zipper)
         (->layout-nodes args)
-        (space-nodes)
+        (space-nodes args)
         (position-nodes)
         (zip/root)))) ;
 
