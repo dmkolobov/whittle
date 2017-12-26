@@ -29,6 +29,15 @@
       loc'
       (recur (zip/next loc') f))))
 
+(defn rewind
+  [loc f]
+  (let [loc' (zip/edit loc f)]
+    (if-let [prev (zip/prev loc')]
+      (recur prev f)
+      (if-let [up (zip/up loc')]
+        (recur up f)
+        loc'))))
+
 (defn zip-seq
   "Given a zipper location, return the sequence of tree nodes in depth
   first order."

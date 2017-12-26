@@ -1,6 +1,6 @@
 (ns whittle-ide.tidy
   (:require [whittle-ide.rect :as rect]
-            [whittle-ide.util :refer [common-keys merge-f fast-forward zip-seq]]
+            [whittle-ide.util :refer [common-keys merge-f fast-forward rewind zip-seq]]
             [clojure.zip :as zip]
             [clojure.set :as set]))
 
@@ -124,16 +124,10 @@
 
 (defn space-nodes
   [loc args]
-  (let [loc' (if (zip/branch? loc)
-               (zip/replace loc (layout-node (zip/node loc)
-                                             (zip/children loc)
-                                             args))
-               loc)]
-  (if-let [prev (zip/prev loc')]
-    (recur prev args)
-    (if-let [up (zip/up loc')]
-      (recur up args)
-      loc'))))
+  (rewind loc (fn [tree]
+                (if (node-branch? tree)
+                  (layout-node tree (:children tree) args)
+                  tree))))
 
 (defn position-nodes
   [loc]
@@ -232,7 +226,6 @@
                        (sort-by first)
                        (map second))
          result   []]
-    (println baseline)
     (if (seq rows)
       (let [nodes        (first rows)
             parts        (map (partial plot-node opts) nodes)
