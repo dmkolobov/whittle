@@ -21,6 +21,7 @@
             [whittle-ide.tidy :refer [tidy] :as tidy]
 
             [whittle-ide.anim :as anim]
+            [whittle-ide.util :as util]
 
             [clojure.zip :as zip]
             [clojure.set :as set]
@@ -40,15 +41,11 @@
        sumsq(a,b)={square(a)+square(b)}:
      sumsq(2,3)")
 
-(defn label-tree
-  [result]
-  (into {}
-        (map (fn [[index result]]
-               [index
-                (cond (playback-node? result) [:pre.prect [:code (print-code (:result result))]]
-                      (hiccup-tree? result)   [:pre.prect.black [:code (name (first result))]]
-                      :default                [:pre.prect [:code (print-code result)]])]))
-        (index-tree result)))
+(defn label-ast
+  [ast-node]
+  (cond (playback-node? ast-node) [:pre.prect [:code (print-code (:result ast-node))]]
+        (hiccup-tree? ast-node)   [:pre.prect.black [:code (name (first ast-node))]]
+        :default                  [:pre.prect [:code (print-code ast-node)]]))
 
 (defn all-measured?
   [labels measures]
@@ -57,11 +54,14 @@
     (= l m)))
 
 (reg-event-db :make-tidy
-              (fn [db [_ tree labels]]
-                (assoc db
-                  :tree          tree
-                  :tree-labels   labels
-                  :tree-measures {})))
+              (fn [db [_ tree args]]
+                (let [tidy-tree (tidy/->tidy tree args)
+                      labels    (tidy/get-labels tidy-tree)]
+                  (assoc db
+                    :tree-args     args
+                    :tree          (tidy/->tidy tree args)
+                    :tree-labels   labels
+                    :tree-measures {}))))
 
 (reg-event-fx :measure-tree
               (fn [{:keys [db]} [_ index bounds]]
@@ -73,16 +73,10 @@
 
 (reg-event-fx :layout-tree
               (fn [{:keys [db]}]
-                (let [{:keys [tree tree-labels tree-measures]} db]
+                (let [{:keys [tree tree-args tree-measures]} db]
                   {:db (assoc db
                          :tidy-tree (time
-                                      (tidy tree
-                                            :id-fn        tree-index
-                                            :branch?      hiccup-tree?
-                                            :gap          10
-                                            :children     rest
-                                            :labels       tree-labels
-                                            :measurements tree-measures))
+                                      (tidy tree tree-measures tree-args))
                          :tree-labels {}
                          :measurements {})
                    :dispatch [:prepare-drawing]})))
@@ -209,26 +203,35 @@
          (fn [{:keys [state states] :as db}]
            (get states state)))
 
+(defn tree-event
+  [tree]
+  [:make-tidy tree
+              {:id-fn    tree-index
+               :label-fn label-ast
+               :branch?  hiccup-tree?
+               :children rest
+               :h-gap    10}])
+
 (reg-event-fx :advance-state
               (fn [{:keys [db]}]
                 (let [idx  (inc (:state db))
                       tree (get-in db [:states idx])]
                   {:db       (assoc db :state idx)
-                   :dispatch [:make-tidy tree (label-tree tree)]})))
+                   :dispatch (tree-event tree)})))
 
 (reg-event-fx :rewind-state
               (fn [{:keys [db]}]
                 (let [idx  (dec (:state db))
                       tree (get-in db [:states idx])]
                   {:db       (assoc db :state idx)
-                   :dispatch [:make-tidy tree (label-tree tree)]})))
+                   :dispatch (tree-event tree)})))
 
 (reg-event-fx :register-states
               (fn [{:keys [db]} [_ states]]
                 {:db (assoc db
                        :state  0
                        :states (vec states))
-                 :dispatch [:make-tidy (first states) (label-tree (first states))]}))
+                 :dispatch (tree-event (first states))}))
 
 (reg-sub :state-idx (fn [db] (get db :state)))
 
@@ -239,8 +242,7 @@
   []
   (let [state (subscribe [:state])
         state-idx (subscribe [:state-idx])]
-    (dispatch [:register-states ;(playback (inspect clj-lang exp-1))])
-                                (playback (inspect clj-lang program-1))])
+    (dispatch [:register-states (playback (inspect clj-lang program-1))])
     (fn []
       [:div
         (if-let [state @state]

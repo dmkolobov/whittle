@@ -10,23 +10,16 @@
 (defn layout-node? [x] (instance? LayoutNode x))
 
 (defn make-child
-  [tree {:keys [branch? children measurements labels id-fn default-id level] :as args}]
+  [tree {:keys [branch? children label-fn id-fn default-id level] :as args}]
   (if (layout-node? tree)
     tree
     (let [id             (or (id-fn tree) default-id)
-          [width height] (get measurements id)
-          label          (get labels id)]
+          label          (label-fn tree)]
       (map->LayoutNode
         {:id       id
 
          :level    level
          :label    label
-
-         :width    width
-         :height   height
-
-         :lcontour {level 0}
-         :rcontour {level width}
 
          :children (when (branch? tree) (children tree))}))))
 
@@ -72,11 +65,11 @@
       (update :rcontour #(merge-rcontour rcontour (push-contour % delta)))))
 
 (defn spread-trees
-  [children {:keys [gap]}]
+  [children {:keys [h-gap]}]
   (reduce (fn [row child]
             (let [{:keys [delta lcontour rcontour]} (last row)
                   overlap (find-overlap rcontour (:lcontour child) delta)
-                  delta   (+ delta overlap gap)]
+                  delta   (+ delta overlap h-gap)]
               (conj row
                     (push-and-merge-contours child delta lcontour rcontour))))
           [(first children)]
@@ -172,15 +165,34 @@
                 (inc current-tick)
                 (add-ticks loc ticks current-tick))))))
 
+(defn ->tidy
+  [tree args]
+  (-> (make-child tree (assoc args :level 0))
+      (layout-zipper)
+      (->layout-nodes args)
+      (zip/root)))
+
+(defn get-labels
+  [tidy-tree]
+  (map (juxt :id :label) (zip-seq (layout-zipper tidy-tree)))) ;
+
+(defn add-dimensions
+  [measures {:keys [level] :as node}]
+  (let [[width height] (get measures (:id node))]
+    (assoc node
+      :width    width
+      :height   height
+      :lcontour {level 0}
+      :rcontour {level width})))
+
 (defn tidy
-  [tree & args]
-  (let [args (apply hash-map args)]
-    (-> (make-child tree (assoc args :level 0))
-        (layout-zipper)
-        (->layout-nodes args)
-        (space-nodes args)
-        (position-nodes)
-        (zip/root)))) ;
+  [tidy-tree measures args]
+  (-> tidy-tree
+      (layout-zipper)
+      (fast-forward (partial add-dimensions measures))
+      (space-nodes args)
+      (position-nodes)
+      (zip/root)))
 
 (defn plot-branch
   [{:keys [edge-stroke edge-height]} {:keys [children] :as node}]
