@@ -22,6 +22,7 @@
 
             [whittle-ide.anim :as anim]
             [whittle-ide.util :as util]
+            [whittle-ide.reagent :refer [tidy-tree]]
 
             [clojure.zip :as zip]
             [clojure.set :as set]
@@ -47,191 +48,27 @@
         (hiccup-tree? ast-node)   [:pre.prect.black [:code (name (first ast-node))]]
         :default                  [:pre.prect [:code (print-code ast-node)]]))
 
-(defn all-measured?
-  [labels measures]
-  (let [l (set (keys labels))
-        m (set (keys measures))]
-    (= l m)))
-
-(reg-event-db :make-tidy
-              (fn [db [_ tree args]]
-                (let [tidy-tree (tidy/->tidy tree args)
-                      labels    (tidy/get-labels tidy-tree)]
-                  (assoc db
-                    :tree-args     args
-                    :tree          (tidy/->tidy tree args)
-                    :tree-labels   labels
-                    :tree-measures {}))))
-
-(reg-event-fx :measure-tree
-              (fn [{:keys [db]} [_ index bounds]]
-                (let [{:keys [tree-labels tree-measures] :as db'}
-                      (assoc-in db [:tree-measures index] bounds)]
-                  (if (all-measured? tree-labels tree-measures)
-                    {:db db' :dispatch [:layout-tree]}
-                    {:db db'}))))
-
-(reg-event-fx :layout-tree
-              (fn [{:keys [db]}]
-                (let [{:keys [tree tree-args tree-measures]} db]
-                  {:db (assoc db
-                         :tidy-tree (time
-                                      (tidy tree tree-measures tree-args))
-                         :tree-labels {}
-                         :measurements {})
-                   :dispatch [:prepare-drawing]})))
-
-(reg-sub :debug identity)
-(reg-sub :labels (fn [db] (get db :tree-labels)))
-(reg-sub :tidy-tree (fn [db] (get db :tidy-tree)))
-(reg-sub :paint-list (fn [db] (get db :paint-list)))
-
-
-(reg-sub :drawing (fn [db] (get db :drawing)))
-
-(reg-event-db :prepare-drawing
-              (fn [{:keys [tidy-tree] :as db}]
-                (assoc db
-                  :drawing {:ticks (tidy/choreograph tidy-tree)
-                            :rects (tidy/plot tidy-tree
-                                              :edge-stroke 5
-                                              :edge-height 10)})))
-
-(defn draw-rect
-  [child {:keys [x y width height]}]
-  (println y)
-  [:div {:style {:transform (anim/translate x y 0)
-                 :position  "absolute"
-                 :width     width
-                 :height    height}}
-   child])
-
-(defn draw-edge
-  [{:keys [width height]}]
-  [:div.edge {:style {:width     width
-                      :height    height}}])
-
-(defn choreograph-parts
-  [ticks {:keys [id children]} {:keys [stem branch]}]
-  (let [tick (get ticks id)]
-    (merge {:root {:delay    tick
-                   :duration 0.25}
-            :body {:delay    (+ tick 0.25)
-                   :duration 0.5}}
-           (when (seq children)
-             (let [[{:keys [id]} & other-children] children
-                   child-tick   (get ticks id)]
-               (if (seq other-children)
-                 (let [slen         (:height stem)
-                       blen         (:width branch)
-                       tlen         (+ slen blen) ;;
-                       stemdur      (* 0.25 (/ slen tlen))
-                       branchdur    (* 0.25 (/ blen tlen))]
-                   {:stem   {:delay    (- child-tick stemdur branchdur)
-                             :duration stemdur}
-                    :branch {:delay    (- child-tick branchdur)
-                             :duration branchdur}})
-                 {:stem {:delay (- child-tick 0.25) :duration .25}}))))))
-
-(def tick-len 600) ;
-
-(defn wrap-part
-  [id choreo transition part-id part child]
-  (let [duration (* tick-len (get-in choreo [part-id :duration]))
-        delay    (* tick-len (get-in choreo [part-id :delay]))]
-    [anim/moves (assoc part
-                  :id      [id part-id]
-                  :timeout (+ delay duration)
-                  :child   [transition (assoc part
-                                         :child    child
-                                         :duration duration
-                                         :delay    delay)])]))
-
-(defn animate-node
-  [ticks [{:keys [id label] :as node} {:keys [root body stem branch] :as parts}]]
-  (let [choreo (choreograph-parts ticks node parts)]
-    [(when root
-       (wrap-part id choreo anim/opens-down :root root [draw-edge root]))
-     (wrap-part id choreo anim/opens-down :body body label)
-     (when stem
-       (wrap-part id choreo anim/opens-down :stem stem [draw-edge stem]))
-     (when branch
-       (wrap-part id choreo anim/opens-horiz :branch branch [draw-edge branch]))]))
-
-(defn animate
-  []
-  (let [drawing (subscribe [:drawing])]
-    (fn []
-      [anim/run-transitions {:timeout-fn :timeout}
-       (when-let [d @drawing]
-         (let [{:keys [ticks rects]} d]
-           (doall
-             (->> rects
-                  (mapcat (partial animate-node ticks))
-                  (filter some?)))))])))
-
-(defn measure
-  [& {:keys [child on-measure]}]
-  (reagent/create-class
-    {:component-did-mount
-     (fn [owner]
-       (let [dom  (reagent/dom-node owner)
-             rect (.getBoundingClientRect dom)]
-         (on-measure [(.-width rect) (.-height rect)])))
-     :reagent-render (fn [& _] child)}))
-
-(defn measure-labels
-  [labels]
-  [:div
-   (for [[index label] labels]
-     ^{:key index}
-     [measure :child     label
-              :on-measure #(dispatch [:measure-tree index %])])])
-
-(defn draw-tree
-  [index tree]
-  (let [labels    (subscribe [:labels])]
-    (fn [tree]
-      [:div.tree
-       (when-let [labels @labels]
-         [:div.hidden [measure-labels labels]])
-       [:div.tidy-tree
-          {:style {:position "absolute"}}
-          [animate]]])))
-
 (reg-sub :state
          (fn [{:keys [state states] :as db}]
            (get states state)))
-
-(defn tree-event
-  [tree]
-  [:make-tidy tree
-              {:id-fn    tree-index
-               :label-fn label-ast
-               :branch?  hiccup-tree?
-               :children rest
-               :h-gap    10}])
 
 (reg-event-fx :advance-state
               (fn [{:keys [db]}]
                 (let [idx  (inc (:state db))
                       tree (get-in db [:states idx])]
-                  {:db       (assoc db :state idx)
-                   :dispatch (tree-event tree)})))
+                  {:db       (assoc db :state idx)})))
 
 (reg-event-fx :rewind-state
               (fn [{:keys [db]}]
                 (let [idx  (dec (:state db))
                       tree (get-in db [:states idx])]
-                  {:db       (assoc db :state idx)
-                   :dispatch (tree-event tree)})))
+                  {:db       (assoc db :state idx)})))
 
 (reg-event-fx :register-states
               (fn [{:keys [db]} [_ states]]
                 {:db (assoc db
                        :state  0
-                       :states (vec states))
-                 :dispatch (tree-event (first states))}))
+                       :states (vec states))}))
 
 (reg-sub :state-idx (fn [db] (get db :state)))
 
@@ -255,7 +92,15 @@
                 :on-click #(do (.preventDefault %) (dispatch [:advance-state]))}
             "next"]]
            [:pre [:code program-1]]
-           [:div [draw-tree @state-idx state]]]
+           [:div [tidy-tree state
+                            {:id-fn    tree-index
+                             :label-fn label-ast
+                             :branch?  hiccup-tree?
+                             :children rest
+
+                             :v-gap    10
+                             :h-gap    10
+                             :stroke   5}]]]
           [:div "..."])])))
 
 (reagent/render-component [hello-world]

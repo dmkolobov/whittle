@@ -166,11 +166,12 @@
                 (add-ticks loc ticks current-tick))))))
 
 (defn ->tidy
-  [tree args]
-  (-> (make-child tree (assoc args :level 0))
-      (layout-zipper)
-      (->layout-nodes args)
-      (zip/root)))
+  [tree opts]
+    (println opts)
+    (-> (make-child tree (assoc opts :level 0))
+        (layout-zipper)
+        (->layout-nodes opts)
+        (zip/root)))
 
 (defn get-labels
   [tidy-tree]
@@ -195,31 +196,31 @@
       (zip/root)))
 
 (defn plot-branch
-  [{:keys [edge-stroke edge-height]} {:keys [children] :as node}]
+  [{:keys [stroke v-gap]} {:keys [children] :as node}]
   (let [cx    (rect/center-x node)
         cxs   (map rect/center-x children)
         min-x (apply min cxs)
         max-x (apply max cxs)
         width (- max-x min-x)
-        left  (- min-x (/ edge-stroke 2))]
-    {:stem   (rect/center cx {:width edge-stroke :height edge-height})
+        left  (- min-x (/ stroke 2))]
+    {:stem   (rect/center cx {:width stroke :height v-gap})
      :branch {:x      left
-              :width  (+ width edge-stroke)
+              :width  (+ width stroke)
               :offset (- cx left)
-              :height edge-stroke}}))
+              :height stroke}}))
 
 (defn plot-node
   "Given a tidy-tree node, return a parts map."
-  [{:keys [edge-stroke edge-height] :as opts}
+  [{:keys [stroke v-gap] :as opts}
    {:keys [level children width height y] :as node}]
   (let [cx (rect/center-x node)]
     (merge (when (not= level 0)
-             {:root (rect/center cx {:width edge-stroke :height (+ edge-height y)})})
+             {:root (rect/center cx {:width stroke :height (+ v-gap y)})})
            {:body (rect/center cx {:width width :height height})}
            (when (seq children)
              (if (= 1 (count children))
-               {:stem (rect/center cx {:width  edge-stroke
-                                       :height (+ edge-height edge-stroke)})}
+               {:stem (rect/center cx {:width  stroke
+                                       :height (+ v-gap stroke)})}
                (plot-branch opts node))))))
 
 (defn plot
@@ -232,7 +233,7 @@
   :branch - the horizontal portion of the child edge.
 
   Each part has an :x, :y, :width, and :height."
-  [tidy-tree & opts]
+  [tidy-tree opts]
   (loop [baseline 0
          rows     (->> (layout-zipper tidy-tree)
                        (zip-seq)
