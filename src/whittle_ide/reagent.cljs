@@ -45,7 +45,6 @@
 (reg-event-fx
   ::measure
   (fn [{:keys [db]} [_ id dimensions]]
-    (println "measure")
     (let [next-db (assoc-in db [::tidy :measures id] dimensions)]
       (if (ready-for-layout? next-db)
         {:db       (update next-db ::tidy dissoc :labels)
@@ -57,7 +56,6 @@
 (reg-event-fx
   ::layout
   (fn [{:keys [db]} _]
-    (println "layout")
     (let [{:keys [tree measures opts]} (::tidy db)]
       {:db       (assoc-in db [::tidy :tree] (time (tidy/tidy tree measures opts)))
        :dispatch [::plot]})))
@@ -67,7 +65,6 @@
 (reg-event-fx
   ::plot
   (fn [{:keys [db]} _]
-    (println "plot")
     (let [{:keys [tree opts]} (::tidy db)]
       {:db       (assoc-in db [::tidy :rects] (tidy/plot tree opts))
        :dispatch [::choreograph]})))
@@ -78,7 +75,6 @@
 (reg-event-db
   ::choreograph
   (fn [db _]
-    (println "choreograph")
     (let [{:keys [tree]} (::tidy db)]
       (assoc-in db
                 [::tidy :ticks]
@@ -115,7 +111,7 @@
 
 (defn measure-labels
   [labels]
-  [:div
+  [:div.hidden
    (for [[index label] labels]
      ^{:key index}
      [measure :child     label

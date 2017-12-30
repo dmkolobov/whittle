@@ -85,8 +85,7 @@ body {
 
 .hidden {
     position: absolute;
-    top: 100%;
-    left: 100%;
+    opacity: 0;
 }
 
 svg {
@@ -172,3 +171,5 @@ line {
     position: absolute;
     background: #000;
 }
+
+.prect { padding: 5px; }
