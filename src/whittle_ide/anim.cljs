@@ -29,59 +29,19 @@
                    "exit"  (timeout-fn opts)}
        :on-enter  #(.-scrollTop %)
        :appear    true}
-       (fn [state]
-         (reagent/as-element [anim (assoc opts :state state)]))])])
-
-(defn snake
-  [{:keys [x]}]
-  (let [state (atom {:x    x
-                     :el   "none"
-                     :mask "none"})]
-    (reagent/create-class
-     {:component-will-receive-props
-      (fn [this]
-        (let [{:keys [x duration delay]} (reagent/props this)]
-          (swap! state
-               (fn [old-state]
-                 (cond (< x (:x old-state))
-                       {:x    x
-                        :el   (transit "transform" (/ duration 2) "linear" delay)
-                        :mask (transit "transform" (/ duration 2) "linear" (+ delay (/ duration 2)))}
-
-                       (> x (:x old-state))
-                       {:x    x
-                        :el   (transit "transform" (/ duration 2) "linear" (+ delay (/ duration 2)))
-                        :mask (transit "transform" (/ duration 2) "linear" delay)}
-
-                       :default (do (println "same") old-state))))))
-      :reagent-render
-      (fn [{:keys [style
-                   x
-                   y
-                   width
-                   height]}]
-        [:div
-         [:div.rect-child
-          {:style (merge style
-                        {:height     height
-                         :transform  (translate x y 0)
-                         :width      2000
-                         :transition (get @state :el)})}]
-         [:div.rect-mask
-          {:style {:transform  (translate (+ x width) y 0)
-                   :width      2000
-                   :transition (get @state :mask)}}]])})))
+       (fn [transition-state]
+         (reagent/as-element [anim (assoc opts :transition-state transition-state)]))])])
 
 (defn compose-child
-  [child state]
+  [child transition-state]
   (if (and (vector? child)
            (map? (second child)))
-    (update child 1 assoc :state state)
+    (update child 1 assoc :transition-state transition-state)
     child))
 
 (defn moves
   [{:keys [child
-           state
+           transition-state
            x
            y
            z
@@ -97,13 +57,13 @@
     [:div.rect-child
      {:style {:transition transition
               :transform  tx}}
-     (compose-child child state)]))
+     (compose-child child transition-state)]))
 
 (defn mask
-  [{:keys [width height state transition initial-transform final-transform]}]
+  [{:keys [width height transition-state transition initial-transform final-transform]}]
   [:div.rect-mask
    {:style (merge {:width width :height height}
-                  (condp = state
+                  (condp = transition-state
                     "entering" {:transform final-transform    :transition transition}
                     "entered"  {:transform final-transform    :transition "none"}
                     "exiting"  {:transform initial-transform  :transition transition}
@@ -111,7 +71,7 @@
 
 (defn opens-horiz
   [{:keys [child
-           state
+           transition-state
            width
            height
 
@@ -128,14 +88,14 @@
     [:div
      {:style {:position "absolute" :overflow "hidden" :width width :height height}}
      child
-     [mask {:state             state
+     [mask {:transition-state  transition-state
             :width             width
             :height            height
             :transition        transition
             :initial-transform (translate (- offset width) 0 (+ z .000001))
             :final-transform   (translate (- width) 0 (+ z .000001))}]
 
-      [mask {:state             state
+      [mask {:transition-state  transition-state
              :width             width
              :height            height
              :transition        transition
@@ -144,7 +104,7 @@
 
 (defn opens-down
   [{:keys [child
-           state
+           transition-state
            width
            height
 
@@ -159,7 +119,7 @@
     [:div
      {:style {:position "absolute" :overflow "hidden" :width width :height height}}
      child
-     [mask {:state             state
+     [mask {:transition-state  transition-state
             :width             width
             :height            height
             :transition        (transit "transform" duration ease delay)
