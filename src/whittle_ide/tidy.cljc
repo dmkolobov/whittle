@@ -224,15 +224,23 @@
                (plot-branch opts node))))))
 
 (defn plot
-  "Given a tidy-tree, return a sequence of vectors [node parts], where parts
-  is a map containing the following keys:
+  "Given a tidy-tree, return a sequence of vectors [node parts], 'node' is a node in
+  the tree, and 'parts' is a map of rectangles representing the drawing of the tree node.
+  The map 'parts' has the following keys:
 
-  :root   - the edge drawn from the parent node branch to the current node
-  :body   - the node label itself
-  :stem   - the portion of the edge drawn from this node to where the edge branches
-  :branch - the horizontal portion of the child edge.
+    :root   - the edge drawn from the parent node branch to the current node
+    :body   - the node label itself
+    :stem   - the portion of the edge drawn from this node to where the edge branches
+    :branch - the horizontal portion of the child edge.
 
-  Each part has an :x, :y, :width, and :height."
+  Each value of 'parts' is map whose keys are a sub-set of #{:root :body :stem branch}.
+
+  'opts' should be a map of the following rendering options:
+
+     :stroke - the width of the edge stroke, in pixels
+     :v-gap  - the minimum height of the root and stem of each node, in pixels
+     :h-gap  - the horizontal gap between each node, in pixels
+    "
   [tidy-tree opts]
   (loop [baseline 0
          rows     (->> (layout-zipper tidy-tree)
