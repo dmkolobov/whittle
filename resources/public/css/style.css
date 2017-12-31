@@ -172,4 +172,9 @@ line {
     background: #000;
 }
 
-.prect { padding: 5px; }
+.prect {
+    padding: 5px;
+    border-style: solid;
+    border-color: #000;
+    border-width: 1px;
+}
