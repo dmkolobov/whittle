@@ -106,7 +106,8 @@
                      (fn [owner]
                        (let [dom  (reagent/dom-node owner)
                              rect (.getBoundingClientRect dom)]
-                         (on-measure [(.-width rect) (.-height rect)])))
+                         (on-measure [(.ceil js/Math (.-width rect))
+                                      (.ceil js/Math (.-height rect))])))
      :reagent-render (fn [& _] child)}))
 
 (defn measure-labels
