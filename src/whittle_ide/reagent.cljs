@@ -24,7 +24,6 @@
   (fn [db [_ tree opts]]
     (let [tidy-tree (tidy/->tidy tree opts)
           labels    (tidy/get-labels tidy-tree)]
-      (println "init")
       (update db
               ::tidy
               assoc
@@ -66,7 +65,7 @@
   ::plot
   (fn [{:keys [db]} _]
     (let [{:keys [tree opts]} (::tidy db)]
-      {:db       (assoc-in db [::tidy :rects] (tidy/plot tree opts))
+      {:db       (assoc-in db [::tidy :plot] (tidy/plot tree opts))
        :dispatch [::choreograph]})))
 
 ;; Defines a timeline for entering/exiting/moving of nodes and edges
@@ -75,10 +74,10 @@
 (reg-event-db
   ::choreograph
   (fn [db _]
-    (let [{:keys [tree]} (::tidy db)]
+    (let [{:keys [tree plot]} (::tidy db)]
       (assoc-in db
-                [::tidy :ticks]
-                (tidy/choreograph tree)))))
+                [::tidy :timeline]
+                (tidy/choreograph tree plot)))))
 
 ;; ---- subscriptions ----------------------------------------------
 
@@ -87,13 +86,13 @@
   (fn [db] (get-in db [::tidy :labels])))
 
 (defn drawing-to-draw
-  "Returns a map containing :rects and :ticks whenever the layout has
+  "Returns a map containing :rects and :enter-times whenever the layout has
   been plotted and choreographed. Returns nil otherwise."
   [db]
   (let [tidy-db (::tidy db)]
-    (when (and (contains? tidy-db :rects)
-               (contains? tidy-db :ticks))
-      (select-keys tidy-db [:rects :ticks]))))
+    (when (and (contains? tidy-db :plot)
+               (contains? tidy-db :timeline))
+      (select-keys tidy-db [:plot :timeline]))))
 
 (reg-sub ::drawing-to-draw drawing-to-draw)
 
@@ -123,32 +122,12 @@
   [:div.edge {:style {:width     width
                       :height    height}}])
 
-(defn choreograph-parts
-  [ticks {:keys [id children]} {:keys [stem branch]}]
-  (let [tick (get ticks id)]
-    (merge {:root {:delay tick          :duration 0.25}
-            :body {:delay (+ tick 0.25) :duration 0.5}}
-           (when (seq children)
-             (let [[{:keys [id]} & other-children] children
-                   child-tick   (get ticks id)]
-               (if (seq other-children)
-                 (let [slen         (:height stem)
-                       blen         (:width branch)
-                       tlen         (+ slen blen) ;;
-                       stemdur      (* 0.25 (/ slen tlen))
-                       branchdur    (* 0.25 (/ blen tlen))]
-                   {:stem   {:delay    (- child-tick stemdur branchdur)
-                             :duration stemdur}
-                    :branch {:delay    (- child-tick branchdur)
-                             :duration branchdur}})
-                 {:stem {:delay (- child-tick 0.25) :duration .25}}))))))
-
-(def tick-len 600) ;
+(def enter-len 600) 
 
 (defn wrap-part
-  [id choreo transition part-id part child]
-  (let [duration (* tick-len (get-in choreo [part-id :duration]))
-        delay    (* tick-len (get-in choreo [part-id :delay]))]
+  [id timeline transition part-id part child]
+  (let [duration (* enter-len (get-in timeline [id part-id :duration]))
+        delay    (* enter-len (get-in timeline [id part-id :delay]))]
     [anim/moves (assoc part
                   :id      [id part-id]
                   :timeout (+ delay duration)
@@ -158,22 +137,21 @@
                                          :delay    delay)])]))
 
 (defn animate-node
-  [ticks [{:keys [id label] :as node} {:keys [root body stem branch] :as parts}]]
-  (let [choreo (choreograph-parts ticks node parts)]
-    [(when root
-       (wrap-part id choreo anim/opens-down :root root [draw-edge root]))
-     (wrap-part id choreo anim/opens-down :body body label)
-     (when stem
-       (wrap-part id choreo anim/opens-down :stem stem [draw-edge stem]))
-     (when branch
-       (wrap-part id choreo anim/opens-horiz :branch branch [draw-edge branch]))]))
+  [timeline [{:keys [id label] :as node} {:keys [root body stem branch] :as parts}]]
+  [(when root
+     (wrap-part id timeline anim/opens-down :root root [draw-edge root]))
+   (wrap-part id timeline anim/opens-down :body body label)
+   (when stem
+     (wrap-part id timeline anim/opens-down :stem stem [draw-edge stem]))
+   (when branch
+     (wrap-part id timeline anim/opens-horiz :branch branch [draw-edge branch]))])
 
 (defn draw-tree
-  [{:keys [rects ticks]}]
+  [{:keys [plot timeline]}]
   [anim/run-transitions {:timeout-fn :timeout}
    (doall
-     (->> rects
-          (mapcat (partial animate-node ticks))
+     (->> plot
+          (mapcat (partial animate-node timeline))
           (filter some?)))])
 
 (defn tidy-tree
