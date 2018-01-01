@@ -15,14 +15,10 @@
                                    reg-event-fx]]
 
             [whittle.core :refer [whittle]]
-            [whittle.paint-rect :as paint-rect :refer [center]]
             [whittle.lang.arithmetic :refer [lang clj-lang]]
             [whittle.inspect :refer [inspect playback index-tree tree-index playback-node? hiccup-tree?]]
-            [whittle-ide.tidy :refer [tidy] :as tidy]
 
-            [whittle-ide.anim :as anim]
-            [whittle-ide.util :as util]
-            [whittle-ide.reagent :refer [tidy-tree]]
+            [tidy-tree.reagent :refer [tidy-tree]]
 
             [clojure.zip :as zip]
             [clojure.set :as set]

@@ -1,4 +1,4 @@
-(ns whittle-ide.reagent
+(ns tidy-tree.reagent
   (:require [cljsjs.react-transition-group]
 
             ["react-transition-group/TransitionGroup" :as TransitionGroup]
@@ -12,8 +12,11 @@
                                    reg-event-db
                                    reg-event-fx]]
 
-            [whittle-ide.tidy :as tidy]
-            [whittle-ide.anim :as anim]))
+            [tidy-tree.layout :refer [->tidy get-labels layout]]
+            [tidy-tree.plot :refer [plot]]
+            [tidy-tree.timeline :refer [choreograph]]
+
+            [tidy-tree.anim :as anim]))
 
 ;; ---- events ------------------------------------------------
 
@@ -22,8 +25,8 @@
 (reg-event-db
   ::init
   (fn [db [_ tree opts]]
-    (let [tidy-tree (tidy/->tidy tree opts)
-          labels    (tidy/get-labels tidy-tree)]
+    (let [tidy-tree (->tidy tree opts)
+          labels    (get-labels tidy-tree)]
       (update db
               ::tidy
               assoc
@@ -56,7 +59,7 @@
   ::layout
   (fn [{:keys [db]} _]
     (let [{:keys [tree measures opts]} (::tidy db)]
-      {:db       (assoc-in db [::tidy :tree] (time (tidy/tidy tree measures opts)))
+      {:db       (assoc-in db [::tidy :tree] (time (layout tree measures opts)))
        :dispatch [::plot]})))
 
 ;; Converts the layout returned by 'tidy' into rectangles representing
@@ -65,7 +68,7 @@
   ::plot
   (fn [{:keys [db]} _]
     (let [{:keys [tree opts]} (::tidy db)]
-      {:db       (assoc-in db [::tidy :plot] (tidy/plot tree opts))
+      {:db       (assoc-in db [::tidy :plot] (plot tree opts))
        :dispatch [::choreograph]})))
 
 ;; Defines a timeline for entering/exiting/moving of nodes and edges
@@ -77,7 +80,7 @@
     (let [{:keys [tree plot]} (::tidy db)]
       (assoc-in db
                 [::tidy :timeline]
-                (tidy/choreograph tree plot)))))
+                (choreograph tree plot)))))
 
 ;; ---- subscriptions ----------------------------------------------
 
@@ -122,7 +125,7 @@
   [:div.edge {:style {:width     width
                       :height    height}}])
 
-(def enter-len 600) 
+(def enter-len 600)
 
 (defn wrap-part
   [id timeline transition part-id part child]
@@ -163,7 +166,7 @@
     (dispatch [::init tree opts])
 
     (fn [_ _]
-      [:div 
+      [:div
        (when-let [labels @labels-to-measure]
          [measure-labels labels])
 

@@ -1,6 +1,22 @@
-(ns whittle-ide.util
+(ns tidy-tree.util
   (:require [clojure.set :as set]
             [clojure.zip :as zip]))
+
+(defrecord LayoutNode
+  [id level label x y width height lcontour rcontour children delta shift])
+
+(defn layout-node? [x] (instance? LayoutNode x))
+
+(defn node-branch? [x] (and (layout-node? x) (seq (:children x))))
+
+(defn zipper
+  [tidy]
+  (zip/zipper node-branch?
+              :children
+              #(assoc %1 :children %2)
+              tidy))
+
+;; ---- hash-map functions ----------------------------------------------------------------
 
 (defn merge-f
   "Merges maps m1 and m2. Whenever two values v1 and v2 exist for the same key,
@@ -21,6 +37,8 @@
   [m1 m2]
   (set/intersection (set (keys m1))
                     (set (keys m2))))
+
+;; ---- zipper functions -----------------------------------------------------------------
 
 (defn fast-forward
   [loc f]

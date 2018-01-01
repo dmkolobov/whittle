@@ -1,4 +1,4 @@
-(ns whittle-ide.anim
+(ns tidy-tree.anim
   (:require [reagent.core :as reagent]
             [cljsjs.react-transition-group]
 
@@ -29,8 +29,8 @@
                    "exit"  (timeout-fn opts)}
        :on-enter  #(.-scrollTop %)
        :appear    true}
-       (fn [transition-state]
-         (reagent/as-element [anim (assoc opts :transition-state transition-state)]))])])
+      (fn [transition-state]
+        (reagent/as-element [anim (assoc opts :transition-state transition-state)]))])])
 
 (defn compose-child
   [child transition-state]
@@ -95,12 +95,12 @@
             :initial-transform (translate (- offset width) 0 (+ z .000001))
             :final-transform   (translate (- width) 0 (+ z .000001))}]
 
-      [mask {:transition-state  transition-state
-             :width             width
-             :height            height
-             :transition        transition
-             :initial-transform (translate offset 0 (+ z .000002))
-             :final-transform   (translate width 0 (+ z .000002))}]]))
+     [mask {:transition-state  transition-state
+            :width             width
+            :height            height
+            :transition        transition
+            :initial-transform (translate offset 0 (+ z .000002))
+            :final-transform   (translate width 0 (+ z .000002))}]]))
 
 (defn opens-down
   [{:keys [child
@@ -116,12 +116,12 @@
     :or {ease  "linear"
          delay 0
          z     0}}]
-    [:div
-     {:style {:position "absolute" :overflow "hidden" :width width :height height}}
-     child
-     [mask {:transition-state  transition-state
-            :width             width
-            :height            height
-            :transition        (transit "transform" duration ease delay)
-            :initial-transform (translate 0 0 z)
-            :final-transform   (translate 0 height z)}]]);;
+  [:div
+   {:style {:position "absolute" :overflow "hidden" :width width :height height}}
+   child
+   [mask {:transition-state  transition-state
+          :width             width
+          :height            height
+          :transition        (transit "transform" duration ease delay)
+          :initial-transform (translate 0 0 z)
+          :final-transform   (translate 0 height z)}]]);;

@@ -1,4 +1,4 @@
-(ns whittle-ide.rect)
+(ns tidy-tree.rect)
 
 (defn center-x
   [{:keys [x width]}]
