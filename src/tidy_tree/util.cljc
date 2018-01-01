@@ -2,20 +2,6 @@
   (:require [clojure.set :as set]
             [clojure.zip :as zip]))
 
-(defrecord LayoutNode
-  [id level label x y width height lcontour rcontour children delta shift])
-
-(defn layout-node? [x] (instance? LayoutNode x))
-
-(defn node-branch? [x] (and (layout-node? x) (seq (:children x))))
-
-(defn zipper
-  [tidy]
-  (zip/zipper node-branch?
-              :children
-              #(assoc %1 :children %2)
-              tidy))
-
 ;; ---- hash-map functions ----------------------------------------------------------------
 
 (defn merge-f
@@ -31,6 +17,10 @@
           {}
           (set/union (set (keys m1))
                      (set (keys m2)))))
+
+(defn diff-map
+  [m1 m2]
+  (reduce dissoc m1 (keys m2)))
 
 (defn common-keys
   "Given two hash-maps, return the set of keys present in both."
@@ -66,3 +56,23 @@
       nodes
       (recur (conj nodes (zip/node loc))
              (zip/next loc)))))
+
+;; ---- tidy tree -----------------------------------------------------------------------
+
+(defrecord LayoutNode
+  [id level label x y width height lcontour rcontour children delta shift])
+
+(defn layout-node? [x] (instance? LayoutNode x))
+
+(defn node-branch? [x] (and (layout-node? x) (seq (:children x))))
+
+(defn zipper
+  [tidy]
+  (zip/zipper node-branch?
+              :children
+              #(assoc %1 :children %2)
+              tidy))
+
+(defn node-seq
+  [tidy-tree]
+  (zip-seq (zipper tidy-tree)))

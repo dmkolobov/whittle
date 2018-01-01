@@ -78,7 +78,7 @@
     (dispatch [:register-states (playback (inspect clj-lang program-1))])
     (fn []
       [:div
-        (if-let [state @state]
+        (if-let [tree @state]
           [:div
            [:div {:style {:float "right"}}
             [:a {:href "#"
@@ -88,7 +88,7 @@
                 :on-click #(do (.preventDefault %) (dispatch [:advance-state]))}
             "next"]]
            [:pre [:code program-1]]
-           [:div [tidy-tree state
+           [:div [tidy-tree tree
                             {:id-fn    tree-index
                              :label-fn label-ast
                              :branch?  hiccup-tree?

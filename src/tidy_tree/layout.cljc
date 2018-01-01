@@ -1,6 +1,6 @@
 (ns tidy-tree.layout
   (:require [clojure.zip :as zip]
-            [tidy-tree.util :refer [layout-node? map->LayoutNode common-keys merge-f fast-forward rewind zip-seq node-branch? zipper]]))
+            [tidy-tree.util :refer [node-seq layout-node? map->LayoutNode common-keys merge-f fast-forward rewind zip-seq node-branch? zipper]]))
 
 (defn make-child
   [tree {:keys [branch? children label-fn id-fn default-id level] :as args}]
@@ -123,7 +123,6 @@
 
 (defn ->tidy
   [tree opts]
-  (println opts)
   (-> (make-child tree (assoc opts :level 0))
       (zipper)
       (->layout-nodes opts)

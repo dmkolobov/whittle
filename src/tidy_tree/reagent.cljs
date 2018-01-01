@@ -12,29 +12,44 @@
                                    reg-event-db
                                    reg-event-fx]]
 
+            [tidy-tree.util :refer [node-seq diff-map]]
             [tidy-tree.layout :refer [->tidy get-labels layout]]
             [tidy-tree.plot :refer [plot]]
             [tidy-tree.timeline :refer [choreograph]]
 
-            [tidy-tree.anim :as anim]))
+            [tidy-tree.anim :as anim]
+            [clojure.set :as set]))
 
 ;; ---- events ------------------------------------------------
+
+(defn entering-nodes
+  [old-nodes new-nodes]
+  (set (->> new-nodes (remove (set old-nodes)) (map :id))))
+
+(defn leaving-nodes
+  [old-nodes new-nodes]
+  (set (->> old-nodes (remove (set new-nodes)) (map :id))))
 
 ;; Initializes DB state for laying out tree. Puts the tidy tree
 ;; component into the measuring state.
 (reg-event-db
   ::init
-  (fn [db [_ tree opts]]
-    (let [tidy-tree (->tidy tree opts)
-          labels    (get-labels tidy-tree)]
-      (update db
-              ::tidy
-              assoc
-              :opts     opts
-              :tree     tidy-tree
-              :labels   labels
-              :measures {}))))
-
+  (fn [db [_ new-tree opts]]
+    (update db
+            ::tidy
+            (fn [{:keys [tree] :as tidy-db}]
+              (let [new-tidy-tree  (->tidy new-tree opts)
+                    old-nodes      (node-seq tree)
+                    new-nodes      (node-seq new-tidy-tree)]
+                (assoc tidy-db
+                  :opts      opts
+                  :tree      new-tidy-tree
+                  :prev-tree new-tree
+                  :labels    (get-labels new-tidy-tree)
+                  :measures  {}
+                  :lifecycle {:entering (entering-nodes old-nodes new-nodes)
+                              :leaving  (leaving-nodes old-nodes new-nodes)}))))))
+;
 (defn ready-for-layout?
   "Returns true if all nodes have been measured and labeled."
   [db]
@@ -59,7 +74,7 @@
   ::layout
   (fn [{:keys [db]} _]
     (let [{:keys [tree measures opts]} (::tidy db)]
-      {:db       (assoc-in db [::tidy :tree] (time (layout tree measures opts)))
+      {:db       (assoc-in db [::tidy :layout-tree] (time (layout tree measures opts)))
        :dispatch [::plot]})))
 
 ;; Converts the layout returned by 'tidy' into rectangles representing
@@ -67,8 +82,8 @@
 (reg-event-fx
   ::plot
   (fn [{:keys [db]} _]
-    (let [{:keys [tree opts]} (::tidy db)]
-      {:db       (assoc-in db [::tidy :plot] (plot tree opts))
+    (let [{:keys [layout-tree opts]} (::tidy db)]
+      {:db       (assoc-in db [::tidy :plot] (plot layout-tree opts))
        :dispatch [::choreograph]})))
 
 ;; Defines a timeline for entering/exiting/moving of nodes and edges
@@ -77,10 +92,10 @@
 (reg-event-db
   ::choreograph
   (fn [db _]
-    (let [{:keys [tree plot]} (::tidy db)]
+    (let [{:keys [layout-tree plot]} (::tidy db)]
       (assoc-in db
                 [::tidy :timeline]
-                (choreograph tree plot)))))
+                (choreograph layout-tree plot)))))
 
 ;; ---- subscriptions ----------------------------------------------
 
@@ -125,7 +140,7 @@
   [:div.edge {:style {:width     width
                       :height    height}}])
 
-(def enter-len 600)
+(def enter-len 200)
 
 (defn wrap-part
   [id timeline transition part-id part child]
@@ -150,25 +165,29 @@
      (wrap-part id timeline anim/opens-horiz :branch branch [draw-edge branch]))])
 
 (defn draw-tree
-  [{:keys [plot timeline]}]
+  [_]
+  (println "Mounting draw tree")
+  (fn
+  [drawing]
   [anim/run-transitions {:timeout-fn :timeout}
    (doall
-     (->> plot
-          (mapcat (partial animate-node timeline))
-          (filter some?)))])
+     (->> (:plot drawing)
+          (mapcat (partial animate-node (:timeline drawing)))
+          (filter some?)))]))
+
+(reg-sub ::prev-tree
+         (fn [db] (get-in db [::tidy :prev-tree])))
 
 (defn tidy-tree
   [tree opts]
   (let [labels-to-measure (subscribe [::labels-to-measure])
-        drawing-to-draw   (subscribe [::drawing-to-draw])]
+        drawing-to-draw   (subscribe [::drawing-to-draw])
+        prev-tree         (subscribe [::prev-tree])]
 
-    ;; kickstart layout algorithm
-    (dispatch [::init tree opts])
-
-    (fn [_ _]
+    (fn [tree opts]
+      (when (not= @prev-tree tree) (dispatch [::init tree opts]))
       [:div
-       (when-let [labels @labels-to-measure]
-         [measure-labels labels])
+       [draw-tree @drawing-to-draw]
 
-       (when-let [drawing @drawing-to-draw]
-         [draw-tree drawing])])))
+       (when-let [labels @labels-to-measure]
+         [measure-labels labels])])))
