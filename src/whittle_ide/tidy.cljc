@@ -137,34 +137,6 @@
                                                  (update :delta + delta (- shift))))
                                            children)))))))
 
-(defn add-ticks
-  "Given a location in the tree, the current tick, and a map of ticks, returns
-  a new map of ticks with an entry for each sibling of the location node, including
-  the location node itself."
-  [loc ticks current-tick]
-  (if loc
-    (recur (zip/right loc)
-           (assoc ticks (:id (zip/node loc)) current-tick)
-           current-tick)
-    ticks))
-
-(defn choreograph
-  "Given a tidy tree, return a map where keys are node ids and values
-  are node ticks."
-  [tidy]
-  (loop [loc          (layout-zipper tidy)
-         current-tick 0
-         ticks        {}]
-     (if (zip/end? loc)
-       ticks
-       (if (contains? ticks (:id (zip/node loc)))
-         (recur (zip/next loc)
-                current-tick
-                ticks)
-         (recur (zip/next loc)
-                (inc current-tick)
-                (add-ticks loc ticks current-tick))))))
-
 (defn ->tidy
   [tree opts]
     (println opts)
@@ -194,6 +166,8 @@
       (space-nodes args)
       (position-nodes)
       (zip/root)))
+
+;; ---- Plotting ----------------------------------------------------------------
 
 (defn plot-branch
   [{:keys [stroke v-gap]} {:keys [children] :as node}]
@@ -262,3 +236,35 @@
                           (map keys parts)
                           spaced-rects))))
       result)))
+
+;; ---- Animation -----------------------------------------------------------------
+
+(defn add-ticks
+  "Given a location in the tree, the current tick, and a map of ticks, returns
+  a new map of ticks with an entry for each sibling of the location node, including
+  the location node itself."
+  [loc ticks current-tick]
+  (if loc
+    (recur (zip/right loc)
+           (assoc ticks (:id (zip/node loc)) current-tick)
+           current-tick)
+    ticks))
+
+(defn choreograph
+  "Given a tidy tree, return a map where keys are node ids and values
+  are node ticks."
+  ([tidy]
+   (choreograph 0 tidy))
+  ([start tidy]
+  (loop [loc          (layout-zipper tidy)
+         current-tick start
+         ticks        {}]
+    (if (zip/end? loc)
+      ticks
+      (if (contains? ticks (:id (zip/node loc)))
+        (recur (zip/next loc)
+               current-tick
+               ticks)
+        (recur (zip/next loc)
+               (inc current-tick)
+               (add-ticks loc ticks current-tick)))))))
