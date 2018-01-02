@@ -47,6 +47,17 @@
                                                     (proportional 0.25
                                                                   (:height stem)
                                                                   (:width branch))))))))
+(defn lifecycle
+  [fired-events sched event choreo-fn]
+  (let [fired?   (fn [{:keys [id]}] (contains? (get fired-events event) id))
+        sched-fn (partial scheduled-for sched :enter)]
+    (fn [timeline {:keys [id] :as node} parts]
+      (if (fired? node)
+        (reduce (fn [timeline [part time]] (assoc-in timeline [id part event] time))
+                timeline
+                (choreo-fn sched-fn node parts))
+        timeline))))
+
 (defn choreograph
   [tidy plot fired-events]
   (let [sched (schedule tidy fired-events)]
