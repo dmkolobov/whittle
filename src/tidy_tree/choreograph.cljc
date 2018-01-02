@@ -60,11 +60,9 @@
 
 (defn choreograph
   [tidy plot fired-events]
-  (let [sched (schedule tidy fired-events)]
-    (reduce (fn [timeline [{:keys [id] :as node} parts]]
-              (assoc timeline
-                id (choreograph-entrance (partial scheduled-for sched :enter)
-                                         node
-                                         parts)))
+  (let [sched (schedule tidy fired-events)
+        enter (lifecycle fired-events sched :enter choreograph-entrance)]
+    (reduce (fn [timeline [node parts]]
+              (enter timeline node parts))
             {}
             plot)))

@@ -143,12 +143,20 @@
   [:div.edge {:style {:width     width
                       :height    height}}])
 
-(def enter-len 600)
+(def tick 600)
+
+(defn get-transitions
+  [timeline id part-id]
+  (reduce (fn [transitions [event [delay duration]]]
+            (assoc transitions
+              event {:delay (* tick delay) :duration (* tick duration)}))
+          {}
+          (get-in timeline [id part-id])))
 
 (defn wrap-part
   [id timeline transition part-id part child]
-  (let [duration (* enter-len (get-in timeline [id part-id :duration]))
-        delay    (* enter-len (get-in timeline [id part-id :delay]))]
+  (println timeline)
+  (let [{:keys [duration delay]} (:enter (get-transitions timeline id part-id))]
     [anim/moves (assoc part
                   :id      [id part-id]
                   :timeout (+ delay duration)

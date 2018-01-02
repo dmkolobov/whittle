@@ -48,7 +48,7 @@
     (if (seq durs)
       (recur (+ now (first durs))
              (rest durs)
-             (conj timeline {:delay now :duration (first durs)}))
+             (conj timeline [now (first durs)]))
       timeline)))
 
 (defn ending-at
@@ -59,5 +59,5 @@
     (if (seq durs)
       (recur (- now (first durs))
              (rest durs)
-             (conj timeline {:delay (- now (first durs)) :duration (first durs)}))
+             (conj timeline [(- now (first durs)) (first durs)]))
       timeline)))
