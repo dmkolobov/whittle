@@ -149,21 +149,26 @@
   [timeline id part-id]
   (reduce (fn [transitions [event [delay duration]]]
             (assoc transitions
-              event {:delay (* tick delay) :duration (* tick duration)}))
+              event {:delay    (* tick delay)
+                     :duration (* tick duration)}))
           {}
           (get-in timeline [id part-id])))
 
+(defn get-timeout
+  [{:keys [enter leave]}]
+  (if (some? enter)
+    (+ (:duration enter) (:delay enter))
+    (if (some? leave) (+ (:duration leave) (:delay leave)) 0)))
+
 (defn wrap-part
   [id timeline transition part-id part child]
-  (println timeline)
-  (let [{:keys [duration delay]} (:enter (get-transitions timeline id part-id))]
+  (let [transitions (get-transitions timeline id part-id)]
     [anim/moves (assoc part
                   :id      [id part-id]
-                  :timeout (+ delay duration)
+                  :timeout (get-timeout transitions)
                   :child   [transition (assoc part
-                                         :child    child
-                                         :duration duration
-                                         :delay    delay)])]))
+                                         :child       child
+                                         :transitions (select-keys transitions [:enter :leave]))])]))
 
 (defn animate-node
   [timeline [{:keys [id label] :as node} {:keys [root body stem branch] :as parts}]]

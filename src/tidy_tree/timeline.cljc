@@ -17,6 +17,7 @@
 
 (defn should-schedule?
   [{:keys [schedule fired]} event loc]
+  (println "should-schedule?" event (:id (zip/node loc)) fired)
   (let [id (:id (zip/node loc))]
     (and
       ;; event has been fired for this location
@@ -36,7 +37,9 @@
           (swap! state
                  (fn [recorder]
                    (if (should-schedule? recorder on loc)
-                     (schedule-event recorder on (write loc))
+                     (do
+                       (println "scheduling" on)
+                       (schedule-event recorder on (write loc)))
                      recorder)))
           loc)))
 

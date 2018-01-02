@@ -25,9 +25,9 @@
      ^{:key [id]}
      [:> Transition
       {:component :div
-       :timeout   {"enter" (timeout-fn opts)
-                   "exit"  (timeout-fn opts)}
+       :timeout   (timeout-fn opts)
        :on-enter  #(.-scrollTop %)
+      ; :unmount-on-exit true
        :appear    true}
       (fn [transition-state]
         (reagent/as-element [anim (assoc opts :transition-state transition-state)]))])])
@@ -59,15 +59,24 @@
               :transform  tx}}
      (compose-child child transition-state)]))
 
+(defn transit-transform
+  [transition]
+  (if transition
+    (let [{:keys [duration delay ease]
+           :or   {ease "linear"}} transition]
+      (transit "transform" duration ease delay))
+    "none"))
+
 (defn mask
-  [{:keys [width height transition-state transition initial-transform final-transform]}]
-  [:div.rect-mask
-   {:style (merge {:width width :height height}
-                  (condp = transition-state
-                    "entering" {:transform final-transform    :transition transition}
-                    "entered"  {:transform final-transform    :transition "none"}
-                    "exiting"  {:transform initial-transform  :transition transition}
-                    "exited"   {:transform initial-transform  :transition transition}))}])
+  [{:keys [width height transition-state transitions initial-transform final-transform]}]
+  (let [{:keys [enter leave]} transitions]
+    [:div.rect-mask
+     {:style (merge {:width width :height height}
+                    (condp = transition-state
+                      "entering" {:transform final-transform    :transition (transit-transform enter)}
+                      "entered"  {:transform final-transform    :transition "none"}
+                      "exiting"  {:transform initial-transform  :transition (transit-transform leave)}
+                      "exited"   {:transform initial-transform  :transition (transit-transform leave)}))}]))
 
 (defn opens-horiz
   [{:keys [child
@@ -79,28 +88,25 @@
 
            z
 
-           duration
-           ease
-           delay]
+           transitions]
     :or {offset (/ width 2)
          ease   "linear"}}]
-  (let [transition (transit "transform" duration ease delay)]
     [:div
      {:style {:position "absolute" :overflow "hidden" :width width :height height}}
      child
      [mask {:transition-state  transition-state
             :width             width
             :height            height
-            :transition        transition
+            :transitions       transitions
             :initial-transform (translate (- offset width) 0 (+ z .000001))
             :final-transform   (translate (- width) 0 (+ z .000001))}]
 
      [mask {:transition-state  transition-state
             :width             width
             :height            height
-            :transition        transition
+            :transitions       transitions
             :initial-transform (translate offset 0 (+ z .000002))
-            :final-transform   (translate width 0 (+ z .000002))}]]))
+            :final-transform   (translate width 0 (+ z .000002))}]])
 
 (defn opens-down
   [{:keys [child
@@ -110,18 +116,14 @@
 
            z
 
-           duration
-           ease
-           delay]
-    :or {ease  "linear"
-         delay 0
-         z     0}}]
+           transitions]
+    :or {z     0}}]
   [:div
    {:style {:position "absolute" :overflow "hidden" :width width :height height}}
    child
    [mask {:transition-state  transition-state
           :width             width
           :height            height
-          :transition        (transit "transform" duration ease delay)
+          :transitions       transitions
           :initial-transform (translate 0 0 z)
           :final-transform   (translate 0 height z)}]]);;
