@@ -49,8 +49,8 @@
                   :prev-tree new-tree
                   :labels    (get-labels new-tidy-tree)
                   :measures  {}
-                  :lifecycle {:entering (entering-nodes old-nodes new-nodes)
-                              :leaving  (leaving-nodes old-nodes new-nodes)}))))))
+                  :lifecycle {:enter (entering-nodes old-nodes new-nodes)
+                              :leave (leaving-nodes old-nodes new-nodes)}))))))
 ;
 (defn ready-for-layout?
   "Returns true if all nodes have been measured and labeled."
