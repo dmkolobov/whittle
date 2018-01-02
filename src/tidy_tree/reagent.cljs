@@ -15,7 +15,7 @@
             [tidy-tree.util :refer [node-seq diff-map]]
             [tidy-tree.layout :refer [->tidy get-labels layout]]
             [tidy-tree.plot :refer [plot]]
-            [tidy-tree.timeline :refer [choreograph]]
+            [tidy-tree.choreograph :refer [choreograph]]
 
             [tidy-tree.anim :as anim]
             [clojure.set :as set]))
