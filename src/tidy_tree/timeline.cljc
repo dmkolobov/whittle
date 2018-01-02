@@ -20,9 +20,8 @@
 (defn find-enter-times
   "Given a tidy tree, return a map where keys are node ids and values
   are node enter-times."
-  ([tidy]
-   (find-enter-times 0 tidy))
-  ([start tidy]
+   [start tidy entering]
+  (println entering)
    (loop [loc           (zipper tidy)
           current-enter start
           enter-times        {}]
@@ -32,9 +31,13 @@
          (recur (zip/next loc)
                 current-enter
                 enter-times)
-         (recur (zip/next loc)
-                (inc current-enter)
-                (add-enter-times loc enter-times current-enter)))))))
+         (if (contains? entering (:id (zip/node loc)))
+           (recur (zip/next loc)
+                  (inc current-enter)
+                  (add-enter-times loc enter-times current-enter))
+           (recur (zip/next loc)
+                  current-enter
+                  enter-times))))))
 
 (defn ff-sequence
   [start durations]
@@ -58,7 +61,7 @@
              (conj timeline {:delay (- now (first durs)) :duration (first durs)}))
       timeline)))
 
-(defn choreograph-parts
+(defn choreograph-entrance
   [enter-times {:keys [id children]} {:keys [stem branch]}]
   (let [enter (get enter-times id)]
     (merge (zipmap [:root :body]
@@ -77,9 +80,10 @@
                  {:stem {:delay (- child-enter 0.25) :duration 0.25}}))))))
 
 (defn choreograph
-  [tidy plot]
-  (let [enter-times (find-enter-times tidy)]
+  [tidy plot {:keys [entering]}]
+  (let [enter-times (find-enter-times 0 tidy entering)]
     (reduce (fn [timeline [{:keys [id] :as node} parts]]
-              (assoc timeline id (choreograph-parts enter-times node parts)))
+              (assoc timeline
+                id (choreograph-entrance enter-times node parts)))
             {}
             plot)))

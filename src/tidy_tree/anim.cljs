@@ -67,7 +67,7 @@
                     "entering" {:transform final-transform    :transition transition}
                     "entered"  {:transform final-transform    :transition "none"}
                     "exiting"  {:transform initial-transform  :transition transition}
-                    "exited"   {:transform initial-transform  :transition "none"}))}])
+                    "exited"   {:transform initial-transform  :transition transition}))}])
 
 (defn opens-horiz
   [{:keys [child

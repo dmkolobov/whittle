@@ -24,11 +24,13 @@
 
 (defn entering-nodes
   [old-nodes new-nodes]
-  (set (->> new-nodes (remove (set old-nodes)) (map :id))))
+  (set (remove (set (map :id old-nodes))
+               (map :id new-nodes))))
 
 (defn leaving-nodes
   [old-nodes new-nodes]
-  (set (->> old-nodes (remove (set new-nodes)) (map :id))))
+  (set (remove (set (map :id new-nodes))
+               (map :id old-nodes))))
 
 ;; Initializes DB state for laying out tree. Puts the tidy tree
 ;; component into the measuring state.
@@ -92,10 +94,12 @@
 (reg-event-db
   ::choreograph
   (fn [db _]
-    (let [{:keys [layout-tree plot]} (::tidy db)]
+    (let [{:keys [layout-tree lifecycle plot]} (::tidy db)]
       (assoc-in db
-                [::tidy :timeline]
-                (choreograph layout-tree plot)))))
+                [::tidy :drawing]
+                {:plot plot
+                 :timeline (choreograph layout-tree plot lifecycle)}))))
+
 
 ;; ---- subscriptions ----------------------------------------------
 
@@ -108,9 +112,8 @@
   been plotted and choreographed. Returns nil otherwise."
   [db]
   (let [tidy-db (::tidy db)]
-    (when (and (contains? tidy-db :plot)
-               (contains? tidy-db :timeline))
-      (select-keys tidy-db [:plot :timeline]))))
+    (when (contains? tidy-db :drawing)
+      (:drawing tidy-db))))
 
 (reg-sub ::drawing-to-draw drawing-to-draw)
 
@@ -140,7 +143,7 @@
   [:div.edge {:style {:width     width
                       :height    height}}])
 
-(def enter-len 200)
+(def enter-len 600)
 
 (defn wrap-part
   [id timeline transition part-id part child]
@@ -166,7 +169,6 @@
 
 (defn draw-tree
   [_]
-  (println "Mounting draw tree")
   (fn
   [drawing]
   [anim/run-transitions {:timeout-fn :timeout}
