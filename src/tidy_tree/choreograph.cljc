@@ -18,29 +18,42 @@
               :on    :enter
               :write schedule-enter))))
 
-(defn choreograph-entrance
-  [schedule {:keys [id children]} {:keys [stem branch]}]
-  (let [enter (get-in schedule [id :enter])]
-    (merge (zipmap [:root :body]
-                   (starting-at enter 0.25 0.5))
-           (when (seq children)
-             (let [[{:keys [id]} & other-children] children
-                   child-enter   (get-in schedule [id :enter])]
-               (if (seq other-children)
-                 (let [slen         (:height stem)
-                       blen         (:width branch)
-                       tlen         (+ slen blen) ;;
-                       stemdur      (* 0.25 (/ slen tlen))
-                       branchdur    (* 0.25 (/ blen tlen))]
-                   (zipmap [:stem :branch]
-                           (ending-at child-enter stemdur branchdur)))
-                 {:stem {:delay (- child-enter 0.25) :duration 0.25}}))))))
+(defn proportional
+  [time & lengths]
+  (let [total (reduce + lengths)]
+    (map #(* time (/ % total)) lengths)))
 
+(defn scheduled-for
+  [sched event {:keys [id children]} & {:keys [child?]}]
+  (get-in sched [(if child? (:id (first children)) id) event]))
+
+(defn mul-child?
+  [{:keys [children]}]
+  (and (seq children) (seq (rest children))))
+
+(defn one-child?
+  [{:keys [children]}]
+  (and (seq children) (not (seq (rest children)))))
+
+(defn choreograph-entrance
+  [scheduled-for node {:keys [stem branch]}]
+  (let [enter (scheduled-for node)]
+    (cond-> (zipmap [:root :body] (starting-at enter 0.25 0.5))
+            (one-child? node) (merge (zipmap [:stem]
+                                             (ending-at (scheduled-for node :child? true) 0.25)))
+            (mul-child? node) (merge (zipmap [:stem :branch]
+                                             (apply ending-at
+                                                    (scheduled-for node :child? true)
+                                                    (proportional 0.25
+                                                                  (:height stem)
+                                                                  (:width branch))))))))
 (defn choreograph
   [tidy plot fired-events]
-  (let [enter-times (schedule tidy fired-events)]
+  (let [sched (schedule tidy fired-events)]
     (reduce (fn [timeline [{:keys [id] :as node} parts]]
               (assoc timeline
-                id (choreograph-entrance enter-times node parts)))
+                id (choreograph-entrance (partial scheduled-for sched :enter)
+                                         node
+                                         parts)))
             {}
             plot)))
