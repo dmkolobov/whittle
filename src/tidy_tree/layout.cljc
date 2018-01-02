@@ -1,6 +1,6 @@
 (ns tidy-tree.layout
   (:require [clojure.zip :as zip]
-            [tidy-tree.util :refer [node-seq layout-node? map->LayoutNode common-keys merge-f fast-forward rewind zip-seq node-branch? zipper]]))
+            [tidy-tree.util :refer [node-seq layout-node? map->LayoutNode common-keys merge-f edit-ff edit-rw zip-seq node-branch? zipper]]))
 
 (defn make-child
   [tree {:keys [branch? children label-fn id-fn default-id level] :as args}]
@@ -89,7 +89,7 @@
 
 (defn ->layout-nodes
   [loc args]
-  (fast-forward loc (fn [{:keys [children id level] :as node}]
+  (edit-ff loc (fn [{:keys [children id level] :as node}]
                       (assoc node
                         :children
                         (map-indexed #(make-child
@@ -101,14 +101,14 @@
 
 (defn space-nodes
   [loc args]
-  (rewind loc (fn [tree]
+  (edit-rw loc (fn [tree]
                 (if (node-branch? tree)
                   (layout-node tree (:children tree) args)
                   tree))))
 
 (defn position-nodes
   [loc]
-  (fast-forward (zip/edit loc
+  (edit-ff (zip/edit loc
                           (fn [{:keys [lcontour] :as node}]
                             (update node :delta - (apply min (vals lcontour)))))
                 (fn [{:keys [delta shift] :as node}]
@@ -145,7 +145,7 @@
   [tidy-tree measures args]
   (-> tidy-tree
       (zipper)
-      (fast-forward (partial add-dimensions measures))
+      (edit-ff (partial add-dimensions measures))
       (space-nodes args)
       (position-nodes)
       (zip/root)))

@@ -2,6 +2,14 @@
   (:require [clojure.set :as set]
             [clojure.zip :as zip]))
 
+(defn arpeggio
+  [n]
+  (if (even? n)
+    (concat (range 0 (/ n 2))
+            (reverse (range 0 (/ n 2))))
+    (let [mid (/ (dec n) 2)]
+      (concat (range 0 mid) (reverse (range 0 (inc mid)))))))
+
 ;; ---- hash-map functions ----------------------------------------------------------------
 
 (defn merge-f
@@ -29,22 +37,30 @@
                     (set (keys m2))))
 
 ;; ---- zipper functions -----------------------------------------------------------------
-
+;;
 (defn fast-forward
   [loc f]
-  (let [loc' (zip/edit loc f)]
+  (let [loc' (f loc)]
     (if (zip/end? (zip/next loc'))
       loc'
       (recur (zip/next loc') f))))
 
+(defn edit-ff
+  [loc f]
+  (fast-forward loc (fn [loc] (zip/edit loc f))))
+
 (defn rewind
   [loc f]
-  (let [loc' (zip/edit loc f)]
+  (let [loc' (f loc)]
     (if-let [prev (zip/prev loc')]
       (recur prev f)
       (if-let [up (zip/up loc')]
         (recur up f)
         loc'))))
+
+(defn edit-rw
+  [loc f]
+  (rewind loc (fn [loc] (zip/edit loc f))))
 
 (defn zip-seq
   "Given a zipper location, return the sequence of tree nodes in depth
