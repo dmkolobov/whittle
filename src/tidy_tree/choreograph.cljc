@@ -1,6 +1,6 @@
 (ns tidy-tree.choreograph
   (:require [clojure.zip :as zip]
-            [tidy-tree.timeline :refer [starting-at record ending-at with-recorder]]
+            [tidy-tree.timeline :refer [starting-at record ending-at skip with-recorder]]
             [tidy-tree.util :refer [zipper fast-forward rewind zip-seq]]))
 
 (defn schedule-enter
@@ -18,7 +18,8 @@
 
 (defn schedule-move
   [loc]
-  ())
+  (let [{:keys [id level]} (zip/node loc)]
+    {id 0}))
 
 (defn schedule
   [tidy-tree fired]
@@ -33,6 +34,9 @@
               :on        :move
               :write     schedule-move
               :in-place? true)
+      (skip state 1)
+      ;(skip state (max (count (:lcontour tidy-tree))
+      ;                 (count (:rcontour tidy-tree))))
       (record state
               (partial fast-forward (zipper tidy-tree))
               :on    :enter
@@ -71,10 +75,11 @@
 (defn choreograph-move
   [scheduled-for node _]
   (let [move (scheduled-for node)]
-    (cond-> {:root [move 1] :body [move 1]}
-            (one-child? node) (assoc :stem [(scheduled-for node :child? true)])
+    (cond-> {:root [move 1]
+             :body [move 1]
+             :stem [move 1]}
             (mul-child? node) (merge (let [child-move (scheduled-for node :child? true)]
-                                       {:stem [child-move 1] :branch [child-move 1]})))))
+                                       {:branch [child-move 1]})))))
 
 (defn choreograph-entrance
   [scheduled-for node {:keys [stem branch]}]

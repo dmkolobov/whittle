@@ -33,6 +33,10 @@
                     (+ now (inc (apply max (vals additions))))))
       (update :schedule write-schedule event now additions)))
 
+(defn skip
+  [state n]
+  (swap! state (fn [r] (update r :now + n))))
+
 (defn record
   [state walk & {:keys [on write in-place?]}]
   (walk (fn [loc]
@@ -40,7 +44,7 @@
                  (fn [recorder]
                    (if (should-schedule? recorder on loc)
                      (do
-                       (println "scheduling" on (:id (zip/node loc)))
+                       ;(println "scheduling" on (:id (zip/node loc)))
                        (schedule-event recorder on (write loc) in-place?))
                      recorder)))
           loc))

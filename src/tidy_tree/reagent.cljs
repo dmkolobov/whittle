@@ -164,7 +164,7 @@
   [:div.edge {:style {:width     width
                       :height    height}}])
 
-(def tick 2000)
+(def tick 400)
 
 (defn get-transitions
   [timeline id part-id]
@@ -186,6 +186,7 @@
   (let [transitions (get-transitions timeline id part-id)
         {:keys [move]} transitions
         {:keys [duration delay]} move]
+    (println "move" delay)
     [anim/moves (assoc part
                   :id      [id part-id]
                   :timeout (get-timeout transitions)
