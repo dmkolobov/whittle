@@ -11,13 +11,13 @@
 
 (defn with-recorder
   [fired f]
+  (println fired)
   (let [state (atom {:now 0 :schedule {} :fired fired})]
     (f state)
     (:schedule @state)))
 
 (defn should-schedule?
   [{:keys [schedule fired]} event loc]
-  (println "should-schedule?" event (:id (zip/node loc)) fired)
   (let [id (:id (zip/node loc))]
     (and
       ;; event has been fired for this location
@@ -38,7 +38,7 @@
                  (fn [recorder]
                    (if (should-schedule? recorder on loc)
                      (do
-                       (println "scheduling" on)
+                       (println "scheduling" on (:id (zip/node loc)))
                        (schedule-event recorder on (write loc)))
                      recorder)))
           loc)))

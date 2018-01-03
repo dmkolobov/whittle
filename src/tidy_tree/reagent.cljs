@@ -29,29 +29,36 @@
 
 (defn leaving-nodes
   [old-nodes new-nodes]
-  (set (remove (set (map :id new-nodes))
-               (map :id old-nodes))))
+  (let [removed (set (remove (set (map :id new-nodes))
+                     (map :id old-nodes)))]
+    (set/union removed
+               (set (->> old-nodes
+                         (filter #(some removed (map :id (:children %))))
+                         (map :id))))))
 
 ;; Initializes DB state for laying out tree. Puts the tidy tree
 ;; component into the measuring state.
-(reg-event-db
+(reg-event-fx
   ::init
-  (fn [db [_ new-tree opts]]
-    (update db
-            ::tidy
-            (fn [{:keys [tree] :as tidy-db}]
-              (let [new-tidy-tree  (->tidy new-tree opts)
-                    old-nodes      (node-seq tree)
-                    new-nodes      (node-seq new-tidy-tree)]
-                (assoc tidy-db
-                  :opts      opts
-                  :tree      new-tidy-tree
-                  :prev-tree new-tree
-                  :labels    (get-labels new-tidy-tree)
-                  :measures  {}
-                  :lifecycle {:enter (entering-nodes old-nodes new-nodes)
-                              :leave (leaving-nodes old-nodes new-nodes)}))))))
-;
+  (fn [{:keys [db]} [_ new-tree opts]]
+    (let [{:keys [tree] :as tidy-db} (::tidy db)
+          new-tidy-tree  (->tidy new-tree opts)
+          old-nodes      (node-seq tree)
+          new-nodes      (node-seq new-tidy-tree)
+          fired-events   {:enter (entering-nodes old-nodes new-nodes)
+                          :leave (leaving-nodes old-nodes new-nodes)}]
+      (merge
+        {:db (assoc db
+               ::tidy (assoc tidy-db
+                        :opts      opts
+                        :tree      new-tidy-tree
+                        :prev-tree new-tree
+                        :labels    (get-labels new-tidy-tree)
+                        :measures  {}
+                        :lifecycle fired-events))}
+        (when (contains? tidy-db :drawing)
+          {:dispatch [::re-draw fired-events]})))))
+      ;
 (defn ready-for-layout?
   "Returns true if all nodes have been measured and labeled."
   [db]
@@ -92,13 +99,22 @@
 ;; for animation
 
 (reg-event-db
+  ::re-draw
+  (fn [db [_ fired]]
+    (update-in db
+               [::tidy :drawing]
+               (fn [{:keys [plot layout-tree] :as drawing}]
+                 (assoc drawing :timeline (choreograph layout-tree plot fired))))))
+
+(reg-event-db
   ::choreograph
   (fn [db _]
     (let [{:keys [layout-tree lifecycle plot]} (::tidy db)]
       (assoc-in db
                 [::tidy :drawing]
-                {:plot plot
-                 :timeline (choreograph layout-tree plot lifecycle)}))))
+                {:plot        plot
+                 :layout-tree layout-tree
+                 :timeline    (choreograph layout-tree plot lifecycle)}))))
 
 
 ;; ---- subscriptions ----------------------------------------------
@@ -156,9 +172,9 @@
 
 (defn get-timeout
   [{:keys [enter leave]}]
-  (if (some? enter)
-    (+ (:duration enter) (:delay enter))
-    (if (some? leave) (+ (:duration leave) (:delay leave)) 0)))
+  (merge {"enter" 0 "leave" 0}
+         (when enter {"enter" (+ (:duration enter) (:delay enter))})
+         (when leave {"leave" (+ (:duration leave) (:delay leave))})))
 
 (defn wrap-part
   [id timeline transition part-id part child]
