@@ -71,12 +71,12 @@
 
 (defn mask
   [{:keys [width height transition-state transitions initial-transform final-transform]}]
-  (let [{:keys [enter leave]} transitions]
+  (let [{:keys [enter leave move]} transitions]
     [:div.rect-mask
      {:style (merge {:width width :height height}
                     (condp = transition-state
                       "entering" {:transform final-transform    :transition (transit-transform enter)}
-                      "entered"  {:transform final-transform    :transition "none"}
+                      "entered"  {:transform final-transform    :transition (transit-transform move)}
                       "exiting"  {:transform initial-transform  :transition (transit-transform leave)}
                       "exited"   {:transform initial-transform  :transition (transit-transform leave)}))}]))
 
@@ -94,17 +94,17 @@
     :or {offset (/ width 2)
          ease   "linear"}}]
     [:div
-     {:style {:position "absolute" :overflow "hidden" :width width :height height}}
+     {:style {:position "absolute" :overflow "hidden" :width 1000 :height height}}
      child
      [mask {:transition-state  transition-state
             :width             width
             :height            height
-            :transitions       transitions
+            :transitions       (dissoc transitions :move)
             :initial-transform (translate (- offset width) 0 (+ z .000001))
             :final-transform   (translate (- width) 0 (+ z .000001))}]
 
      [mask {:transition-state  transition-state
-            :width             width
+            :width             1000
             :height            height
             :transitions       transitions
             :initial-transform (translate offset 0 (+ z .000002))

@@ -120,9 +120,9 @@
     (-> db
         (assoc-in [::tidy :leave-frame]
                   (let [{:keys [layout-tree plot]} (get-in db [::tidy :drawing])
-                        leave-only (select-keys fired [:leave])]
+                        leave-only (select-keys fired [:leave :move])]
                     (choreograph layout-tree plot leave-only)))
-        (assoc-in [::tidy :leave-finish] (count (:leave fired))))))
+        (assoc-in [::tidy :leave-finish] (inc (count (:leave fired)))))))
 
 (reg-event-fx
   ::choreograph
@@ -136,11 +136,8 @@
                                               :start leave-finish)}]
       (if drawing
         (if leave-frame
-          (do
-            (println "flush leaving" leave-frame leave-finish)
-            (println "fired events" fired-events)
-            {:db             (assoc-in db [::tidy :drawing :timeline] leave-frame)
-             :dispatch [::next-tick new-drawing]})
+          {:db       (assoc-in db [::tidy :drawing :timeline] leave-frame)
+           :dispatch [::next-tick new-drawing]}
           {:db db
            :dispatch-later [{:ms 100 :dispatch [::choreograph]}]})
         {:db (assoc-in db [::tidy :drawing] new-drawing)}))))
@@ -148,7 +145,6 @@
 (reg-event-db
   ::next-tick
   (fn [db [_ drawing]]
-    (println "flush moving and entering" (:timeline drawing))
     (-> db
         (assoc-in [::tidy :drawing] drawing)
         (update ::tidy dissoc :leave-frame))))
@@ -192,10 +188,10 @@
 
 (defn draw-edge
   [{:keys [width height]}]
-  [:div.edge {:style {:width     width
-                      :height    height}}])
+  [:div.edge {:style {:width     1000
+                      :height    1000}}])
 
-(def tick 1000)
+(def tick 400)
 
 (defn get-transitions
   [timeline id part-id]
@@ -223,7 +219,7 @@
                    :timeout (get-timeout transitions)
                    :child   [transition (assoc part
                                           :child       child
-                                          :transitions (select-keys transitions [:enter :leave]))]))]))
+                                          :transitions transitions)]))]))
 
 (defn animate-node
   [timeline [{:keys [id label] :as node} {:keys [root body stem branch] :as parts}]]

@@ -11,7 +11,7 @@
 
 (defn with-recorder
   [start fired f]
-  (println fired)
+ ; (println fired)
   (let [state (atom {:now start :schedule {} :fired fired})]
     (f state)
     (:schedule @state)))
