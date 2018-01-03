@@ -24,8 +24,12 @@
 
 (defn entering-nodes
   [old-nodes new-nodes]
-  (set (remove (set (map :id old-nodes))
-               (map :id new-nodes))))
+  (let [added (set (remove (set (map :id old-nodes))
+                   (map :id new-nodes)))]
+    (set/union added
+               (set (->> new-nodes
+                         (filter #(some added (map :id (:children %))))
+                         (map :id))))))
 
 (defn leaving-nodes
   [old-nodes new-nodes]
