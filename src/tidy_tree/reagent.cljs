@@ -50,6 +50,7 @@
           old-nodes      (node-seq tree)
           new-nodes      (node-seq new-tidy-tree)
           fired-events   {:enter (entering-nodes old-nodes new-nodes)
+                          :move  (set (map :id new-nodes))
                           :leave (leaving-nodes old-nodes new-nodes)}]
       (merge
         {:db (assoc db
@@ -163,7 +164,7 @@
   [:div.edge {:style {:width     width
                       :height    height}}])
 
-(def tick 600)
+(def tick 2000)
 
 (defn get-transitions
   [timeline id part-id]
@@ -182,10 +183,14 @@
 
 (defn wrap-part
   [id timeline transition part-id part child]
-  (let [transitions (get-transitions timeline id part-id)]
+  (let [transitions (get-transitions timeline id part-id)
+        {:keys [move]} transitions
+        {:keys [duration delay]} move]
     [anim/moves (assoc part
                   :id      [id part-id]
                   :timeout (get-timeout transitions)
+                  :duration duration
+                  :delay    delay
                   :child   [transition (assoc part
                                          :child       child
                                          :transitions (select-keys transitions [:enter :leave]))])]))

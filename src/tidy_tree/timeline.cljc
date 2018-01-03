@@ -26,22 +26,25 @@
       (not (contains? (get schedule id) event)))))
 
 (defn schedule-event
-  [{:keys [now] :as recorder} event additions]
+  [{:keys [now] :as recorder} event additions in-place?]
   (-> recorder
-      (update :now + (inc (apply max (vals additions))))
+      (assoc :now (if in-place?
+                    now
+                    (+ now (inc (apply max (vals additions))))))
       (update :schedule write-schedule event now additions)))
 
 (defn record
-  [state walk & {:keys [on write]}]
+  [state walk & {:keys [on write in-place?]}]
   (walk (fn [loc]
           (swap! state
                  (fn [recorder]
                    (if (should-schedule? recorder on loc)
                      (do
                        (println "scheduling" on (:id (zip/node loc)))
-                       (schedule-event recorder on (write loc)))
+                       (schedule-event recorder on (write loc) in-place?))
                      recorder)))
-          loc)))
+          loc))
+  (when in-place? (swap! state update :now inc)))
 
 (defn starting-at
   [start & durations]

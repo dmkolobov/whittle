@@ -1,7 +1,7 @@
 (ns tidy-tree.choreograph
   (:require [clojure.zip :as zip]
             [tidy-tree.timeline :refer [starting-at record ending-at with-recorder]]
-            [tidy-tree.util :refer [zipper fast-forward rewind]]))
+            [tidy-tree.util :refer [zipper fast-forward rewind zip-seq]]))
 
 (defn schedule-enter
   [loc]
@@ -16,6 +16,10 @@
         ids (map :id (zip/rights loc))]
     (zipmap (conj ids id) (repeat (inc (count ids)) 0))))
 
+(defn schedule-move
+  [loc]
+  ())
+
 (defn schedule
   [tidy-tree fired]
   (with-recorder fired
@@ -24,6 +28,11 @@
               (partial rewind (fast-forward (zipper tidy-tree) identity))
               :on    :leave
               :write schedule-leave)
+      (record state
+              (partial fast-forward (zipper tidy-tree))
+              :on        :move
+              :write     schedule-move
+              :in-place? true)
       (record state
               (partial fast-forward (zipper tidy-tree))
               :on    :enter
@@ -60,13 +69,12 @@
                                                                   (:height stem))))))))
 
 (defn choreograph-move
-  [scheduled-for node {:keys [stem branch]}]
+  [scheduled-for node _]
   (let [move (scheduled-for node)]
-    (cond-> {:root [move 1] :body [move 2]}
+    (cond-> {:root [move 1] :body [move 1]}
             (one-child? node) (assoc :stem [(scheduled-for node :child? true)])
             (mul-child? node) (merge (let [child-move (scheduled-for node :child? true)]
-                                       {:stem   [child-move 1]
-                                        :branch [child-move 1]})))))
+                                       {:stem [child-move 1] :branch [child-move 1]})))))
 
 (defn choreograph-entrance
   [scheduled-for node {:keys [stem branch]}]
@@ -97,10 +105,12 @@
   (let [sched     (schedule tidy fired-events)
         lifecycle (partial lifecycle fired-events sched)
         leave     (lifecycle :leave choreograph-leave)
+        move      (lifecycle :move choreograph-move)
         enter     (lifecycle :enter choreograph-entrance)]
     (reduce (fn [timeline [node parts]]
               (-> timeline
                   (leave node parts)
+                  (move node parts)
                   (enter node parts)))
             {}
             plot)))
