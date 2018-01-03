@@ -18,12 +18,12 @@
 
 (defn schedule-move
   [loc]
-  (let [{:keys [id level]} (zip/node loc)]
+  (let [{:keys [id]} (zip/node loc)]
     {id 0}))
 
 (defn schedule
-  [tidy-tree fired]
-  (with-recorder fired
+  [start tidy-tree fired]
+  (with-recorder start fired
     (fn [state]
       (record state
               (partial rewind (fast-forward (zipper tidy-tree) identity))
@@ -35,8 +35,6 @@
               :write     schedule-move
               :in-place? true)
       (skip state 1)
-      ;(skip state (max (count (:lcontour tidy-tree))
-      ;                 (count (:rcontour tidy-tree))))
       (record state
               (partial fast-forward (zipper tidy-tree))
               :on    :enter
@@ -97,7 +95,7 @@
 (defn lifecycle
   [fired-events sched event choreo-fn]
   (let [fired?   (fn [{:keys [id]}] (contains? (get fired-events event) id))
-        sched-fn (partial scheduled-for sched :enter)]
+        sched-fn (partial scheduled-for sched event)]
     (fn [timeline {:keys [id] :as node} parts]
       (if (fired? node)
         (reduce (fn [timeline [part time]] (assoc-in timeline [id part event] time))
@@ -106,12 +104,13 @@
         timeline))))
 
 (defn choreograph
-  [tidy plot fired-events]
-  (let [sched     (schedule tidy fired-events)
+  [tidy plot fired-events & {:keys [start] :or {start 0}}]
+  (let [sched     (schedule start tidy fired-events)
         lifecycle (partial lifecycle fired-events sched)
         leave     (lifecycle :leave choreograph-leave)
         move      (lifecycle :move choreograph-move)
         enter     (lifecycle :enter choreograph-entrance)]
+    (println sched)
     (reduce (fn [timeline [node parts]]
               (-> timeline
                   (leave node parts)

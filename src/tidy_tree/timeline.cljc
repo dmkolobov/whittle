@@ -10,9 +10,9 @@
           additions))
 
 (defn with-recorder
-  [fired f]
+  [start fired f]
   (println fired)
-  (let [state (atom {:now 0 :schedule {} :fired fired})]
+  (let [state (atom {:now start :schedule {} :fired fired})]
     (f state)
     (:schedule @state)))
 
@@ -47,8 +47,7 @@
                        ;(println "scheduling" on (:id (zip/node loc)))
                        (schedule-event recorder on (write loc) in-place?))
                      recorder)))
-          loc))
-  (when in-place? (swap! state update :now inc)))
+          loc)))
 
 (defn starting-at
   [start & durations]

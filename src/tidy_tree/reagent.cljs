@@ -60,7 +60,7 @@
                         :prev-tree new-tree
                         :labels    (get-labels new-tidy-tree)
                         :measures  {}
-                        :lifecycle fired-events))}
+                        :fired-events fired-events))}
         (when (contains? tidy-db :drawing)
           {:dispatch [::re-draw fired-events]})))))
       ;
@@ -106,21 +106,41 @@
 (reg-event-db
   ::re-draw
   (fn [db [_ fired]]
-    (update-in db
-               [::tidy :drawing]
-               (fn [{:keys [plot layout-tree] :as drawing}]
-                 (assoc drawing :timeline (choreograph layout-tree plot fired))))))
+    (-> db
+        (assoc-in [::tidy :leave-frame]
+                  (let [{:keys [layout-tree plot]} (get-in db [::tidy :drawing])
+                        leave-only (select-keys fired [:leave])]
+                    (choreograph layout-tree plot leave-only)))
+        (assoc-in [::tidy :leave-finish] (count (:leave fired))))))
+
+(reg-event-fx
+  ::choreograph
+  (fn [{:keys [db]} _]
+    (let [{:keys [layout-tree fired-events plot drawing leave-frame leave-finish]} (::tidy db)
+          new-drawing {:plot plot
+                       :layout-tree layout-tree
+                       :timeline (choreograph layout-tree
+                                              plot
+                                              (select-keys fired-events [:enter :move])
+                                              :start leave-finish)}]
+      (if drawing
+        (if leave-frame
+          (do
+            (println "flush leaving" leave-frame leave-finish)
+            (println "fired events" fired-events)
+            {:db             (assoc-in db [::tidy :drawing :timeline] leave-frame)
+             :dispatch [::next-tick new-drawing]})
+          {:db db
+           :dispatch-later [{:ms 100 :dispatch [::choreograph]}]})
+        {:db (assoc-in db [::tidy :drawing] new-drawing)}))))
 
 (reg-event-db
-  ::choreograph
-  (fn [db _]
-    (let [{:keys [layout-tree lifecycle plot]} (::tidy db)]
-      (assoc-in db
-                [::tidy :drawing]
-                {:plot        plot
-                 :layout-tree layout-tree
-                 :timeline    (choreograph layout-tree plot lifecycle)}))))
-
+  ::next-tick
+  (fn [db [_ drawing]]
+    (println "flush moving and entering" (:timeline drawing))
+    (-> db
+        (assoc-in [::tidy :drawing] drawing)
+        (update ::tidy dissoc :leave-frame))))
 
 ;; ---- subscriptions ----------------------------------------------
 
@@ -184,17 +204,15 @@
 (defn wrap-part
   [id timeline transition part-id part child]
   (let [transitions (get-transitions timeline id part-id)
-        {:keys [move]} transitions
-        {:keys [duration delay]} move]
-    (println "move" delay)
-    [anim/moves (assoc part
-                  :id      [id part-id]
-                  :timeout (get-timeout transitions)
-                  :duration duration
-                  :delay    delay
-                  :child   [transition (assoc part
-                                         :child       child
-                                         :transitions (select-keys transitions [:enter :leave]))])]))
+        {:keys [move]} transitions]
+    [anim/moves
+     (merge (when move move)
+            (assoc part
+                   :id      [id part-id]
+                   :timeout (get-timeout transitions)
+                   :child   [transition (assoc part
+                                          :child       child
+                                          :transitions (select-keys transitions [:enter :leave]))]))]))
 
 (defn animate-node
   [timeline [{:keys [id label] :as node} {:keys [root body stem branch] :as parts}]]
@@ -210,6 +228,7 @@
   [_]
   (fn
   [drawing]
+    (println "drawing")
   [anim/run-transitions {:timeout-fn :timeout}
    (doall
      (->> (:plot drawing)

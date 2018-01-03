@@ -53,7 +53,9 @@
          delay 0
          z     0}}]
   (let [tx         (translate x y z)
-        transition (transit "transform" duration ease delay)]
+        transition (if duration
+                     (transit "transform" duration ease delay)
+                     "none")]
     [:div.rect-child
      {:style {:transition transition
               :transform  tx}}
