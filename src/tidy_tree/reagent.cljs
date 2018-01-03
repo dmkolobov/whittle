@@ -24,8 +24,9 @@
 
 (defn entering-nodes
   [old-nodes new-nodes]
-  (let [added (set (remove (set (map :id old-nodes))
-                   (map :id new-nodes)))]
+  (let [old   (set (map :id old-nodes))
+        new   (set (map :id new-nodes))
+        added (set/difference new old)]
     (set/union added
                (set (->> new-nodes
                          (filter #(some added (map :id (:children %))))
@@ -40,6 +41,18 @@
                          (filter #(some removed (map :id (:children %))))
                          (map :id))))))
 
+(defn moving-nodes
+  [new-nodes entering leaving]
+  (set (map :id new-nodes)))
+
+(defn fire-events
+  [old-nodes new-nodes]
+  (let [entering (entering-nodes old-nodes new-nodes)
+        leaving  (leaving-nodes old-nodes new-nodes)]
+    {:enter entering
+     :leave leaving
+     :move  (moving-nodes new-nodes entering leaving)}))
+
 ;; Initializes DB state for laying out tree. Puts the tidy tree
 ;; component into the measuring state.
 (reg-event-fx
@@ -49,9 +62,7 @@
           new-tidy-tree  (->tidy new-tree opts)
           old-nodes      (node-seq tree)
           new-nodes      (node-seq new-tidy-tree)
-          fired-events   {:enter (entering-nodes old-nodes new-nodes)
-                          :move  (set (map :id new-nodes))
-                          :leave (leaving-nodes old-nodes new-nodes)}]
+          fired-events   (fire-events old-nodes new-nodes)]
       (merge
         {:db (assoc db
                ::tidy (assoc tidy-db
@@ -184,7 +195,7 @@
   [:div.edge {:style {:width     width
                       :height    height}}])
 
-(def tick 400)
+(def tick 1000)
 
 (defn get-transitions
   [timeline id part-id]
