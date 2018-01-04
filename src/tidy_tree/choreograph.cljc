@@ -54,7 +54,11 @@
 
 (defn node-listeners
   [{:keys [id children] :as node} {:keys [stem branch root] :as parts}]
-  (let [listeners (merge (if root
+  (let [listeners (merge {[:on :move id] #{[id :root :move 100]
+                                           [id :body :move 100]
+                                           [id :stem :move 100]
+                                           [id :branch :move 100]}}
+                         (if root
                            (rooted-node node parts)
                            (solo-node node parts))
                          (cond (and (seq children)

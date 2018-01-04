@@ -41,7 +41,11 @@
   [cycle]
   (apply max
          (map (fn [transit-seq]
-                (reduce + (map last transit-seq)))
+                (cond (vector? transit-seq)
+                      (reduce + (map last transit-seq))
+
+                      (set? transit-seq)
+                      (apply max (map last transit-seq))))
               cycle)))
 
 (defn start-at
@@ -57,9 +61,14 @@
 
 (defn add-transitions
   [now timeline transit-seq]
-  (into timeline
-         (zipmap (map pop transit-seq)
-                 (apply start-at now (map last transit-seq)))))
+  (cond (vector? transit-seq)
+        (into timeline
+               (zipmap (map pop transit-seq)
+                       (apply start-at now (map last transit-seq))))
+
+        (set? transit-seq)
+        (into timeline
+              (map (fn [t] [(pop t) [now (last t)]]) transit-seq))))
 
 (defn run-lifecycle
   [now timeline cycles]
