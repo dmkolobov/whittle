@@ -25,25 +25,20 @@
 (defn entering-nodes
   [old-nodes new-nodes]
   (let [old   (set (map :id old-nodes))
-        new   (set (map :id new-nodes))
-        added (set/difference new old)]
-    (set/union added
-               (set (->> new-nodes
-                         (filter #(some added (map :id (:children %))))
-                         (map :id))))))
+        new   (set (map :id new-nodes))]
+    (set/difference new old)))
 
 (defn leaving-nodes
   [old-nodes new-nodes]
-  (let [removed (set (remove (set (map :id new-nodes))
-                     (map :id old-nodes)))]
-    (set/union removed
-               (set (->> old-nodes
-                         (filter #(some removed (map :id (:children %))))
-                         (map :id))))))
+  (let [old   (set (map :id old-nodes))
+        new   (set (map :id new-nodes))]
+    (set/difference old new)))
 
 (defn moving-nodes
   [new-nodes entering leaving]
-  (set (map :id new-nodes)))
+  (set/difference (set (map :id new-nodes))
+                  entering
+                  leaving))
 
 (defn fire-events
   [old-nodes new-nodes]
@@ -122,7 +117,7 @@
                   (let [{:keys [layout-tree plot]} (get-in db [::tidy :drawing])
                         leave-only (select-keys fired [:leave :move])]
                     (choreograph layout-tree plot leave-only)))
-        (assoc-in [::tidy :leave-finish] (inc (count (:leave fired)))))))
+        (assoc-in [::tidy :leave-finish] (count (:leave fired))))))
 
 (reg-event-fx
   ::choreograph
@@ -133,7 +128,7 @@
                        :timeline (choreograph layout-tree
                                               plot
                                               (select-keys fired-events [:enter :move])
-                                              :start leave-finish)}]
+                                              )}]
       (if drawing
         (if leave-frame
           {:db       (assoc-in db [::tidy :drawing :timeline] leave-frame)
@@ -191,7 +186,7 @@
   [:div.edge {:style {:width     1000
                       :height    1000}}])
 
-(def tick 400)
+(def tick 1)
 
 (defn get-transitions
   [timeline id part-id]

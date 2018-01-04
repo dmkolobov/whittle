@@ -1,120 +1,82 @@
 (ns tidy-tree.choreograph
   (:require [clojure.zip :as zip]
-            [tidy-tree.timeline :refer [starting-at record ending-at skip with-recorder]]
+            [clojure.set :as set]
+            [tidy-tree.timeline :refer [record register-handler run-schedule]]
             [tidy-tree.util :refer [zipper fast-forward rewind zip-seq]]))
 
-(defn schedule-enter
-  [loc]
-  (let [id  (:id (zip/node loc))
-        ids (map :id (zip/rights loc))]
-    (zipmap (conj ids id) (repeat (inc (count ids)) 0))))
+(defn enters [loc]  (map :id (conj (zip/rights loc) (zip/node loc))))
+(defn leaves [loc]  (map :id (conj (zip/lefts loc) (zip/node loc))))
 
-(defn schedule-leave
-  [loc]
-  (println "Scheduling leave")
-  (let [id  (:id (zip/node loc))
-        ids (map :id (zip/rights loc))]
-    (zipmap (conj ids id) (repeat (inc (count ids)) 0))))
-
-(defn schedule-move
-  [loc]
-  (let [{:keys [id]} (zip/node loc)]
-    {id 0}))
-
-(defn schedule
-  [start tidy-tree fired]
-  (with-recorder start fired
-    (fn [state]
-      (record state
-              (partial rewind (fast-forward (zipper tidy-tree) identity))
-              :on    :leave
-              :write schedule-leave)
-      (record state
-              (partial fast-forward (zipper tidy-tree))
-              :on        :move
-              :write     schedule-move
-              :in-place? true)
-      (skip state 1)
-      (record state
-              (partial fast-forward (zipper tidy-tree))
-              :on    :enter
-              :write schedule-enter))))
+(defn make-schedule
+  [tidy-tree fired-events]
+  (let [front   (zipper tidy-tree)
+        back    (fast-forward front identity)]
+    (record fired-events
+            (fn [fire!]
+              (rewind back (fn [loc] (fire! :leave (leaves loc)) loc))
+              (fire! :move (map :id (zip-seq front)))
+              (fast-forward front (fn [loc] (fire! :enter (enters loc)) loc))))))
 
 (defn proportional
   [time & lengths]
   (let [total (reduce + lengths)]
     (map #(* time (/ % total)) lengths)))
 
-(defn scheduled-for
-  [sched event {:keys [id children]} & {:keys [child?]}]
-  (get-in sched [(if child? (:id (first children)) id) event]))
+(defn skinny-node
+  [{:keys [id] :as node} _]
+  (let [child-id (:id (first (:children node)))]
+    {[:before :enter child-id] [[id :stem :enter 200]]
+     [:after  :leave child-id] [[id :stem :leave 200]]}))
 
-(defn mul-child?
-  [{:keys [children]}]
-  (and (seq children) (seq (rest children))))
+(defn fat-node
+  [{:keys [id children] :as node} {:keys [stem branch] :as parts}]
+  (let [child-id        (:id (first children))
+        [s-time b-time] (proportional 200 (:height stem) (:width branch))]
+    (println "fat" parts s-time b-time)
+    {[:before :enter child-id] [[id :stem   :enter s-time]
+                                [id :branch :enter b-time]]
 
-(defn one-child?
-  [{:keys [children]}]
-  (and (seq children) (not (seq (rest children)))))
+     [:after :leave child-id] [[id :branch :leave b-time]
+                               [id :stem   :leave s-time]]}))
 
-(defn choreograph-leave
-  [scheduled-for node {:keys [stem branch]}]
-  (let [leave (scheduled-for node)]
-    (cond-> (zipmap [:body :root] (starting-at leave 0.5 0.25))
-            (one-child? node) (merge (zipmap [:stem]
-                                             (starting-at (+ (scheduled-for node :child? true) 0.75) 0.25)))
-            (mul-child? node) (merge (zipmap [:branch :stem]
-                                             (apply starting-at
-                                                    (+ (scheduled-for node :child? true) 0.75)
-                                                    (proportional 0.25
-                                                                  (:width branch)
-                                                                  (:height stem))))))))
+(defn rooted-node
+  [{:keys [id] :as node} _]
+  {[:on :enter id] [[id :root :enter 200]
+                    [id :body :enter 250]]
 
-(defn choreograph-move
-  [scheduled-for node _]
-  (let [move (scheduled-for node)]
-    (cond-> {:root [move 1]
-             :body [move 1]
-             :stem [move 1]}
-            (mul-child? node) (merge (let [child-move (scheduled-for node :child? true)]
-                                       {:branch [child-move 1]})))))
+   [:on :leave id] [[id :body :leave 250]
+                    [id :root :leave 200]]})
 
-(defn choreograph-entrance
-  [scheduled-for node {:keys [stem branch]}]
-  (let [enter (scheduled-for node)]
-    (cond-> (zipmap [:root :body] (starting-at enter 0.25 0.5))
-            (one-child? node) (merge (zipmap [:stem]
-                                             (ending-at (scheduled-for node :child? true) 0.25)))
-            (mul-child? node) (merge (zipmap [:stem :branch]
-                                             (apply ending-at
-                                                    (scheduled-for node :child? true)
-                                                    (proportional 0.25
-                                                                  (:height stem)
-                                                                  (:width branch))))))))
+(defn solo-node
+  [{:keys [id] :as node} _]
+  {[:on :enter id] [[id :body :enter 250]]
+   [:on :leave id] [[id :body :leave 250]]})
 
-(defn lifecycle
-  [fired-events sched event choreo-fn]
-  (let [fired?   (fn [{:keys [id]}] (contains? (get fired-events event) id))
-        sched-fn (partial scheduled-for sched event)]
-    (fn [timeline {:keys [id] :as node} parts]
-      (if (fired? node)
-        (reduce (fn [timeline [part time]] (assoc-in timeline [id part event] time))
-                timeline
-                (choreo-fn sched-fn node parts))
-        timeline))))
+(defn node-listeners
+  [{:keys [id children] :as node} {:keys [stem branch root] :as parts}]
+  (let [listeners (merge (if root
+                           (rooted-node node parts)
+                           (solo-node node parts))
+                         (cond (and (seq children)
+                                    (seq (rest children))) (fat-node node parts)
+                               (seq children)              (skinny-node node parts)))]
+    (println (keys listeners))
+    listeners))
+;;
+(defn plot-listeners
+  [tidy-tree plot]
+  (reduce (fn [listeners [node parts]]
+            (reduce (partial apply register-handler)
+                    listeners
+                    (node-listeners node parts)))
+          {}
+          plot))
 
 (defn choreograph
-  [tidy plot fired-events & {:keys [start] :or {start 0}}]
-  (let [sched     (schedule start tidy fired-events)
-        lifecycle (partial lifecycle fired-events sched)
-        leave     (lifecycle :leave choreograph-leave)
-        move      (lifecycle :move choreograph-move)
-        enter     (lifecycle :enter choreograph-entrance)]
-    (println sched)
-    (reduce (fn [timeline [node parts]]
-              (-> timeline
-                  (leave node parts)
-                  (move node parts)
-                  (enter node parts)))
-            {}
-            plot)))
+  [tidy-tree plot fired-events]
+  (reduce (fn [timeline [path interval]]
+            (assoc-in timeline path interval))
+          {}
+          (run-schedule (make-schedule tidy-tree fired-events)
+                        [:before :on :after]
+                        (plot-listeners tidy-tree plot))))
