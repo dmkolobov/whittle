@@ -15,7 +15,7 @@
             [tidy-tree.util :refer [node-seq diff-map]]
             [tidy-tree.layout :refer [->tidy get-labels layout]]
             [tidy-tree.plot :refer [plot]]
-            [tidy-tree.choreograph :refer [choreograph]]
+            [tidy-tree.choreograph :refer [choreograph plot-listeners]]
 
             [tidy-tree.anim :as anim]
             [clojure.set :as set]))
@@ -116,7 +116,7 @@
         (assoc-in [::tidy :leave-frame]
                   (let [{:keys [layout-tree plot]} (get-in db [::tidy :drawing])
                         leave-only (select-keys fired [:leave :move])]
-                    (choreograph layout-tree plot leave-only)))
+                    (choreograph layout-tree (plot-listeners plot) leave-only)))
         (assoc-in [::tidy :leave-finish] (count (:leave fired))))))
 
 (reg-event-fx
@@ -126,9 +126,8 @@
           new-drawing {:plot plot
                        :layout-tree layout-tree
                        :timeline (choreograph layout-tree
-                                              plot
-                                              (select-keys fired-events [:enter :move])
-                                              )}]
+                                              (plot-listeners plot)
+                                              (select-keys fired-events [:enter :move]))}]
       (if drawing
         (if leave-frame
           {:db       (assoc-in db [::tidy :drawing :timeline] leave-frame)

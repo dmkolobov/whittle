@@ -68,7 +68,7 @@
     listeners))
 ;;
 (defn plot-listeners
-  [tidy-tree plot]
+  [plot]
   (reduce (fn [listeners [node parts]]
             (reduce (partial apply register-handler)
                     listeners
@@ -77,10 +77,10 @@
           plot))
 
 (defn choreograph
-  [tidy-tree plot fired-events]
+  [tidy-tree listeners fired-events]
   (reduce (fn [timeline [path interval]]
             (assoc-in timeline path interval))
           {}
           (run-schedule (make-schedule tidy-tree fired-events)
                         [:before :on :after]
-                        (plot-listeners tidy-tree plot))))
+                        listeners)))
